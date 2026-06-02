@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YouTube Favorites Feed</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1 data-i18n="appTitle">YouTube Favorites</h1>
+      <p data-i18n="appSubtitle">Local channel favorites, no real YouTube subscription.</p>
+    </div>
+    <button id="refreshBtn" title="Refresh">↻</button>
+  </header>
+
+  <section class="add-box">
+    <input id="channelInput" />
+    <button id="addBtn" data-i18n="add">Add</button>
+  </section>
+
+  <div id="status"></div>
+
+  <nav>
+    <button class="tab active" data-tab="feed" data-i18n="whatsNew">What's new</button>
+    <button class="tab" data-tab="channels" data-i18n="channels">Channels</button>
+    <button class="tab" data-tab="settings" data-i18n="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="feed" class="panel active">
+      <div class="toolbar">
+        <span id="feedCount"></span>
+        <button id="markSeenBtn" data-i18n="markSeen">Mark seen</button>
+      </div>
+      <div id="videos"></div>
+    </section>
+
+    <section id="channels" class="panel">
+      <div id="channelList"></div>
+    </section>
+
+    <section id="settings" class="panel">
+      <label class="row">
+        <span data-i18n="language">Language</span>
+        <select id="language">
+          <option value="auto">Auto</option>
+          <option value="en">English</option>
+          <option value="ro">Română</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+        </select>
+      </label>
+      <label class="row">
+        <span data-i18n="checkEvery">Check every minutes</span>
+        <input id="checkMinutes" type="number" min="15" step="5" />
+      </label>
+      <label class="row">
+        <span data-i18n="videosPerChannel">Videos per channel</span>
+        <input id="maxVideos" type="number" min="1" max="20" />
+      </label>
+      <label class="row check">
+        <span data-i18n="notifications">Notifications for new videos</span>
+        <input id="notify" type="checkbox" />
+      </label>
+      <label class="row check">
+        <span data-i18n="showOverlay">Show floating panel on YouTube</span>
+        <input id="showOverlay" type="checkbox" />
+      </label>
+      <label class="row check">
+        <span data-i18n="accessibilityMode">Accessibility mode / impaired eyesight</span>
+        <input id="accessibilityMode" type="checkbox" />
+      </label>
+      <button id="saveSettingsBtn" data-i18n="saveSettings">Save settings</button>
+      <p class="hint" data-i18n="privacyHint">Brave/Chrome may ask for notification permission. The extension does not use your YouTube account.</p>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
