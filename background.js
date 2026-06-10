@@ -4,6 +4,8 @@ const STORAGE_DEFAULTS = {
   seenVideoIds: [],
   videoStatuses: {},
   favoriteVideos: [],
+  viewedHistory: [],
+  savedChannelVideoIds: {},
   overlayPosition: null,
   instanceId: null,
   onlineStats: null,
@@ -51,8 +53,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       else if (msg?.type === 'getState') sendResponse(await getState());
       else if (msg?.type === 'markAllSeen') sendResponse(await markAllSeen());
       else if (msg?.type === 'saveSettings') sendResponse(await saveSettings(msg.settings));
-      else if (msg?.type === 'markVideoViewing') sendResponse(await markVideoViewing(msg.videoId));
-      else if (msg?.type === 'markVideoViewed') sendResponse(await markVideoViewed(msg.videoId));
+      else if (msg?.type === 'markVideoViewing') sendResponse(await markVideoViewing(msg.videoId, msg.video));
+      else if (msg?.type === 'markVideoViewed') sendResponse(await markVideoViewed(msg.videoId, msg.video));
       else if (msg?.type === 'updateViewingFromUrl') sendResponse(await updateViewingFromUrl(msg.videoId || ''));
       else if (msg?.type === 'addFavoriteVideo') sendResponse(await addFavoriteVideo(msg.video));
       else if (msg?.type === 'removeFavoriteVideo') sendResponse(await removeFavoriteVideo(msg.videoId));
@@ -61,11 +63,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       else if (msg?.type === 'saveOverlayPosition') sendResponse(await saveOverlayPosition(msg.position));
       else if (msg?.type === 'checkGitHubUpdate') sendResponse(await checkGitHubUpdate(false));
       else if (msg?.type === 'onlineHeartbeat') sendResponse(await onlineHeartbeat(false));
+      else if (msg?.type === 'clearViewedHistory') sendResponse(await clearViewedHistory());
+      else if (msg?.type === 'exportData') sendResponse(await exportData());
+      else if (msg?.type === 'importData') sendResponse(await importData(msg.data));
+      else if (msg?.type === 'openSettings') sendResponse(await openSettingsPage());
       else sendResponse({ ok: false, error: 'Unknown message type' });
     } catch (err) { sendResponse({ ok: false, error: String(err?.message || err) }); }
   })();
   return true;
 });
+
+async function openSettingsPage() {
+  const url = chrome.runtime.getURL('popup.html#settings');
+  try {
+    await chrome.tabs.create({ url });
+    return { ok: true, mode: 'tab' };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+}
 
 async function setupAlarm() {
   const { settings } = await chrome.storage.local.get('settings');
@@ -84,7 +100,7 @@ async function setupAlarm() {
 
 async function getState() {
   const data = await chrome.storage.local.get(Object.keys(STORAGE_DEFAULTS));
-  return { ok: true, ...STORAGE_DEFAULTS, ...data, settings: { ...STORAGE_DEFAULTS.settings, ...(data.settings || {}) }, videoStatuses: { ...(data.videoStatuses || {}) }, favoriteVideos: Array.isArray(data.favoriteVideos) ? data.favoriteVideos : [] };
+  return { ok: true, ...STORAGE_DEFAULTS, ...data, settings: { ...STORAGE_DEFAULTS.settings, ...(data.settings || {}) }, videoStatuses: { ...(data.videoStatuses || {}) }, favoriteVideos: Array.isArray(data.favoriteVideos) ? data.favoriteVideos : [], viewedHistory: Array.isArray(data.viewedHistory) ? data.viewedHistory : [], savedChannelVideoIds: { ...(data.savedChannelVideoIds || {}) } };
 }
 
 async function saveSettings(next) {
@@ -255,12 +271,12 @@ async function addChannel(input) {
 }
 
 async function removeChannel(channelId) {
-  const { channels, videos, videoStatuses } = await chrome.storage.local.get(['channels', 'videos', 'videoStatuses']);
+  const { channels, videos } = await chrome.storage.local.get(['channels', 'videos']);
   const newChannels = (channels || []).filter(c => c.channelId !== channelId);
   const newVideos = (videos || []).filter(v => v.channelId !== channelId);
-  const nextStatuses = { ...(videoStatuses || {}) };
-  for (const v of videos || []) if (v.channelId === channelId) delete nextStatuses[v.videoId];
-  await chrome.storage.local.set({ channels: newChannels, videos: newVideos, videoStatuses: nextStatuses });
+  // Do not delete videoStatuses/viewedHistory here. The user may remove a channel
+  // but still expects the watched history and viewed state to remain available.
+  await chrome.storage.local.set({ channels: newChannels, videos: newVideos });
   return { ok: true };
 }
 
@@ -325,21 +341,23 @@ function normalizeVideo(v) {
   };
 }
 
-async function markVideoViewing(videoId) {
+async function markVideoViewing(videoId, video = null) {
   if (!videoId) return { ok: false, error: 'Missing videoId' };
   const { videoStatuses } = await chrome.storage.local.get('videoStatuses');
   const next = { ...(videoStatuses || {}) };
   if (next[videoId] !== 'viewed') next[videoId] = 'viewing';
-  await chrome.storage.local.set({ videoStatuses: next });
+  await chrome.storage.local.set({ videoStatuses: trimVideoStatuses(next) });
+  await rememberViewedVideo(videoId, 'viewing', video);
   return { ok: true, videoStatuses: next };
 }
 
-async function markVideoViewed(videoId) {
+async function markVideoViewed(videoId, video = null) {
   if (!videoId) return { ok: false, error: 'Missing videoId' };
   const { videoStatuses } = await chrome.storage.local.get('videoStatuses');
   const next = { ...(videoStatuses || {}) };
   next[videoId] = 'viewed';
-  await chrome.storage.local.set({ videoStatuses: next });
+  await chrome.storage.local.set({ videoStatuses: trimVideoStatuses(next) });
+  await rememberViewedVideo(videoId, 'viewed', video);
   return { ok: true, videoStatuses: next };
 }
 
@@ -348,8 +366,62 @@ async function updateViewingFromUrl(videoId) {
   const next = { ...(videoStatuses || {}) };
   let changed = false;
   if (videoId && next[videoId] !== 'viewed' && next[videoId] !== 'viewing') { next[videoId] = 'viewing'; changed = true; }
-  if (changed) await chrome.storage.local.set({ videoStatuses: next });
+  if (changed) {
+    await chrome.storage.local.set({ videoStatuses: trimVideoStatuses(next) });
+    await rememberViewedVideo(videoId, 'viewing', null);
+  }
   return { ok: true, videoStatuses: next };
+}
+
+async function rememberViewedVideo(videoId, status, video = null) {
+  if (!videoId) return;
+  const data = await chrome.storage.local.get(['viewedHistory', 'videos', 'favoriteVideos']);
+  const known = normalizeVideo(video || findVideoInLists(videoId, data.videos, data.favoriteVideos) || { videoId });
+  const list = Array.isArray(data.viewedHistory) ? data.viewedHistory : [];
+  const now = new Date().toISOString();
+  const item = { ...known, videoId, status: status === 'viewed' ? 'viewed' : 'viewing', lastViewedAt: now };
+  const next = [item, ...list.filter(v => v.videoId !== videoId)].slice(0, 1000);
+  await chrome.storage.local.set({ viewedHistory: next });
+}
+
+function findVideoInLists(videoId, ...lists) {
+  for (const list of lists) {
+    const found = (Array.isArray(list) ? list : []).find(v => v && v.videoId === videoId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function trimVideoStatuses(statuses) {
+  const entries = Object.entries(statuses || {});
+  if (entries.length <= 5000) return statuses || {};
+  return Object.fromEntries(entries.slice(-5000));
+}
+
+async function clearViewedHistory() {
+  await chrome.storage.local.set({ viewedHistory: [] });
+  return { ok: true, viewedHistory: [] };
+}
+
+async function exportData() {
+  const keys = Object.keys(STORAGE_DEFAULTS);
+  const data = await chrome.storage.local.get(keys);
+  return { ok: true, exportedAt: new Date().toISOString(), version: chrome.runtime.getManifest().version, data };
+}
+
+async function importData(payload) {
+  const source = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+  if (!source || typeof source !== 'object') return { ok: false, error: 'Invalid backup file.' };
+  const allowed = Object.keys(STORAGE_DEFAULTS);
+  const update = {};
+  for (const key of allowed) {
+    if (typeof source[key] !== 'undefined') update[key] = source[key];
+  }
+  if (update.settings) update.settings = { ...STORAGE_DEFAULTS.settings, ...(update.settings || {}) };
+  if (update.videoStatuses) update.videoStatuses = trimVideoStatuses(update.videoStatuses);
+  if (Object.keys(update).length) await chrome.storage.local.set(update);
+  await setupAlarm();
+  return { ok: true, importedKeys: Object.keys(update) };
 }
 
 async function searchVideos(query) {
@@ -427,9 +499,8 @@ async function refreshAllFeeds(isAutomatic) {
   const newItems = allVideos.filter(v => !previousIds.has(v.videoId));
   const knownSeen = new Set(oldSeen);
   for (const v of allVideos) if (previousIds.has(v.videoId)) knownSeen.add(v.videoId);
-  const currentIds = new Set(allVideos.map(v => v.videoId));
-  const nextStatuses = {};
-  for (const [id, status] of Object.entries(videoStatuses || {})) if (currentIds.has(id)) nextStatuses[id] = status;
+  // Keep all statuses, not only current feed IDs. Viewed/search/related videos must survive feed refreshes.
+  const nextStatuses = trimVideoStatuses({ ...(videoStatuses || {}) });
   await chrome.storage.local.set({ channels: updatedChannels, videos: allVideos, seenVideoIds: [...knownSeen].slice(-1000), videoStatuses: nextStatuses });
   if (isAutomatic && settings?.notify && newItems.length) {
     const first = newItems[0]; chrome.notifications.create(`ytfav-${first.videoId}`, { type: 'basic', iconUrl: 'icon-128.png', title: `${newItems.length} new video${newItems.length > 1 ? 's' : ''}`, message: `${first.channelTitle}: ${first.title}` });

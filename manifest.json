@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "YouTube Favorites Feed",
-  "version": "1.4.7",
+  "version": "1.5.1",
   "default_locale": "en",
-  "description": "Local YouTube favorites feed with floating panel, related videos, search, saved videos, theater mode, page-bridge navigation, GitHub update checks, optional online user stats and stable panel scroll.",
+  "description": "Local YouTube favorites feed with persistent history, backup export/import, online users, theater mode, build history, smoother overlay alignment and overlay settings shortcut.",
   "permissions": [
     "storage",
     "alarms",

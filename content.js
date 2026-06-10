@@ -4,7 +4,7 @@
   ensurePageBridge();
 
   const ROOT_ID = 'youtube-favorites-feed-overlay-root';
-  const DEFAULTS = { overlayOpen: true, overlayTab: 'feed', overlayPages: { feed: 1, related: 1, search: 1, favvideos: 1 } };
+  const DEFAULTS = { overlayOpen: true, overlayTab: 'feed', overlayPages: { feed: 1, related: 1, search: 1, favvideos: 1, history: 1 } };
   const RELATED_CACHE_KEY = 'yff_related_cache_v1';
   const PAGE_SIZE = 6;
   const STYLE_TEXT = `/* Keep the overlay above YouTube sticky channel/header elements. */
@@ -33,8 +33,9 @@
   width: 370px;
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 92px);
-  background: #111;
+  background: rgba(17,17,17,.92);
   color: #eee;
+  backdrop-filter: blur(3px);
   border: 1px solid #303030;
   border-radius: 16px;
   z-index: 2147483647;
@@ -177,12 +178,12 @@
 /* Accessibility / impaired eyesight mode */
 .fys-accessibility .fys-panel {
   width: 430px;
-  background: #000;
+  background: rgba(0,0,0,.90);
   border: 2px solid #fff;
   box-shadow: 0 0 0 3px rgba(255,255,255,.22), 0 18px 60px rgba(0,0,0,.75);
 }
 .fys-accessibility .fys-header {
-  background: #000;
+  background: rgba(0,0,0,.92);
   border-bottom-color: #fff;
   padding: 14px;
 }
@@ -210,7 +211,7 @@
 .fys-accessibility .fys-hint { color: #fff; font-size: 14px; }
 .fys-accessibility .fys-video,
 .fys-accessibility .fys-channel {
-  background: #000;
+  background: rgba(0,0,0,.90);
   border: 2px solid #fff;
   border-radius: 10px;
   padding: 12px;
@@ -267,8 +268,8 @@
 /* v1.2.5 anti-flicker: the panel must remain opaque while tabs re-render. */
 .fys-wrap { isolation: isolate; }
 .fys-panel, .fys-body, .fys-tabs, .fys-header { backface-visibility: hidden; transform: translateZ(0); }
-.fys-panel { background-color: #111 !important; will-change: transform; }
-.fys-accessibility .fys-panel { background-color: #000 !important; }
+.fys-panel { background-color: rgba(17,17,17,.92) !important; will-change: transform; }
+.fys-accessibility .fys-panel { background-color: rgba(0,0,0,.90) !important; }
 
 
 /* v1.2.6 pagination and stable tab layout */
@@ -300,6 +301,8 @@
   let preservedPanelScroll = null;
   let storageReloadTimer = null;
   let suppressStorageReloadUntil = 0;
+  const optimisticSavedVideoIds = new Set();
+  const optimisticSavedChannelVideoIds = new Set();
   let ui = { ...DEFAULTS };
   let lang = 'en';
   let relatedVideos = [];
@@ -311,12 +314,12 @@
   let videoMonitorEl = null;
 
   const I18N = {
-    en: { collapsed:'Favorites', title:'YouTube Favorites', subtitle:'Always on top on YouTube', whatsNew:"What's new", related:'Related', search:'Search', favVideos:'Saved videos', channels:'Channels', add:'Add', playAll:'Play all', saveVideo:'Save video', saved:'Saved', saveChannel:'Save channel', videos:'videos', new:'new', noVideos:'No videos yet. Add a channel.', noRelated:'Open a YouTube video to see related videos.', noSaved:'No saved favorite videos yet.', remove:'Remove', emptyList:'Your local favorites channels list is empty.', placeholder:'@channel, channel ID or URL', searchPlaceholder:'Search YouTube videos...', loadFail:'Could not load extension data.', checking:'Checking new videos...', refreshErrors:'Refresh with errors', refreshOk:'Refresh OK. New', enterChannel:'Enter @handle, URL or UC...', looking:'Looking up channel...', deleted:'Channel removed.', deleting:'Removing channel...', exists:'Channel already exists.', added:'Added', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Type a search term and press Search.', searching:'Searching...', noSearch:'No results.', positionSaved:'Position saved.', accessibilityToggle:'Accessibility', theaterToggle:'Theater mode', onlineUsers:'online users', onlineUsersUnavailable:'online stats off', relatedLoading:'Loading related videos...', relatedHint:'If this stays empty, scroll the YouTube page once and press refresh.', next:'Next', previous:'Previous', page:'Page' },
-    ro: { collapsed:'Favorite', title:'Favorite YouTube', subtitle:'Always on top pe YouTube', whatsNew:"What's new", related:'Related', search:'Caută', favVideos:'Video favorite', channels:'Canale', add:'Adaugă', playAll:'Play all', saveVideo:'Salvează video', saved:'Salvat', saveChannel:'Salvează canal', videos:'video-uri', new:'noi', noVideos:'Nu există video-uri încă. Adaugă un canal.', noRelated:'Deschide un video YouTube ca să apară video-uri asemănătoare.', noSaved:'Nu ai video-uri favorite salvate.', remove:'Șterge', emptyList:'Lista locală de canale favorite este goală.', placeholder:'@canal, channel ID sau URL', searchPlaceholder:'Caută video-uri pe YouTube...', loadFail:'Nu pot încărca datele extensiei.', checking:'Verific noutățile...', refreshErrors:'Refresh cu erori', refreshOk:'Refresh OK. Noi', enterChannel:'Introdu @handle, URL sau UC...', looking:'Caut canalul...', deleted:'Canal șters.', deleting:'Șterg canalul...', exists:'Canalul exista deja.', added:'Adăugat', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Scrie un termen și apasă Caută.', searching:'Caut...', noSearch:'Nu am găsit rezultate.', positionSaved:'Poziție salvată.', accessibilityToggle:'Accesibilitate', theaterToggle:'Mod cinema', onlineUsers:'utilizatori online', onlineUsersUnavailable:'statistici online oprite', relatedLoading:'Încarc video-uri asemănătoare...', relatedHint:'Dacă rămâne gol, fă scroll o dată în pagina YouTube și apasă refresh.' },
-    de: { collapsed:'Favoriten', title:'YouTube Favoriten', subtitle:'Immer oben auf YouTube', whatsNew:'Neu', related:'Ähnlich', search:'Suche', favVideos:'Gespeichert', channels:'Kanäle', add:'Hinzufügen', playAll:'Alle abspielen', saveVideo:'Video speichern', saved:'Gespeichert', saveChannel:'Kanal speichern', videos:'Videos', new:'neu', noVideos:'Noch keine Videos.', noRelated:'Öffne ein YouTube-Video.', noSaved:'Keine gespeicherten Videos.', remove:'Entfernen', emptyList:'Kanalliste ist leer.', placeholder:'@Kanal, ID oder URL', searchPlaceholder:'YouTube suchen...', loadFail:'Daten konnten nicht geladen werden.', checking:'Prüfe neue Videos...', refreshErrors:'Refresh mit Fehlern', refreshOk:'Refresh OK. Neu', enterChannel:'@Handle, URL oder UC... eingeben', looking:'Suche Kanal...', deleted:'Kanal entfernt.', deleting:'Entferne Kanal...', exists:'Kanal existiert bereits.', added:'Hinzugefügt', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Suchbegriff eingeben.', searching:'Suche...', noSearch:'Keine Ergebnisse.', positionSaved:'Position gespeichert.', accessibilityToggle:'Barrierefrei', theaterToggle:'Kinomodus', relatedLoading:'Ähnliche Videos werden geladen...', relatedHint:'Wenn die Liste leer bleibt, scrolle YouTube einmal und drücke Refresh.' },
-    fr: { collapsed:'Favoris', title:'Favoris YouTube', subtitle:'Toujours visible sur YouTube', whatsNew:'Nouveautés', related:'Similaires', search:'Recherche', favVideos:'Vidéos sauvées', channels:'Chaînes', add:'Ajouter', playAll:'Tout lire', saveVideo:'Sauver vidéo', saved:'Sauvé', saveChannel:'Sauver chaîne', videos:'vidéos', new:'nouveau', noVideos:'Aucune vidéo.', noRelated:'Ouvrez une vidéo YouTube.', noSaved:'Aucune vidéo sauvée.', remove:'Supprimer', emptyList:'Liste vide.', placeholder:'@chaîne, ID ou URL', searchPlaceholder:'Rechercher sur YouTube...', loadFail:'Impossible de charger.', checking:'Recherche...', refreshErrors:'Erreurs', refreshOk:'OK. Nouveau', enterChannel:'Entrez @handle, URL ou UC...', looking:'Recherche chaîne...', deleted:'Chaîne supprimée.', deleting:'Suppression...', exists:'Déjà existante.', added:'Ajouté', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Entrez une recherche.', searching:'Recherche...', noSearch:'Aucun résultat.', positionSaved:'Position sauvée.', accessibilityToggle:'Accessibilité', theaterToggle:'Mode cinéma', relatedLoading:'Chargement des vidéos similaires...', relatedHint:'Si la liste reste vide, faites défiler YouTube puis actualisez.', next:'Suivant', previous:'Précédent', page:'Page' },
-    es: { collapsed:'Favoritos', title:'Favoritos YouTube', subtitle:'Siempre encima en YouTube', whatsNew:'Novedades', related:'Relacionados', search:'Buscar', favVideos:'Vídeos guardados', channels:'Canales', add:'Añadir', playAll:'Reproducir todo', saveVideo:'Guardar vídeo', saved:'Guardado', saveChannel:'Guardar canal', videos:'vídeos', new:'nuevo', noVideos:'No hay vídeos.', noRelated:'Abre un vídeo de YouTube.', noSaved:'No hay vídeos guardados.', remove:'Eliminar', emptyList:'Lista vacía.', placeholder:'@canal, ID o URL', searchPlaceholder:'Buscar en YouTube...', loadFail:'No se pudo cargar.', checking:'Buscando...', refreshErrors:'Errores', refreshOk:'OK. Nuevo', enterChannel:'Introduce @handle, URL o UC...', looking:'Buscando canal...', deleted:'Canal eliminado.', deleting:'Eliminando...', exists:'Ya existe.', added:'Añadido', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Escribe una búsqueda.', searching:'Buscando...', noSearch:'Sin resultados.', positionSaved:'Posición guardada.', accessibilityToggle:'Accesibilidad', theaterToggle:'Modo cine', relatedLoading:'Cargando vídeos relacionados...', relatedHint:'Si sigue vacío, desplaza YouTube una vez y pulsa actualizar.', next:'Siguiente', previous:'Anterior', page:'Página' },
-    it: { collapsed:'Preferiti', title:'Preferiti YouTube', subtitle:'Sempre in primo piano', whatsNew:'Novità', related:'Correlati', search:'Cerca', favVideos:'Video salvati', channels:'Canali', add:'Aggiungi', playAll:'Riproduci tutti', saveVideo:'Salva video', saved:'Salvato', saveChannel:'Salva canale', videos:'video', new:'nuovo', noVideos:'Nessun video.', noRelated:'Apri un video YouTube.', noSaved:'Nessun video salvato.', remove:'Rimuovi', emptyList:'Lista vuota.', placeholder:'@canale, ID o URL', searchPlaceholder:'Cerca su YouTube...', loadFail:'Errore caricamento.', checking:'Controllo...', refreshErrors:'Errori', refreshOk:'OK. Nuovo', enterChannel:'Inserisci @handle, URL o UC...', looking:'Cerco canale...', deleted:'Canale rimosso.', deleting:'Rimozione...', exists:'Esiste già.', added:'Aggiunto', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Scrivi una ricerca.', searching:'Cerco...', noSearch:'Nessun risultato.', positionSaved:'Posizione salvata.', accessibilityToggle:'Accessibilità', theaterToggle:'Modalità cinema', relatedLoading:'Carico video correlati...', relatedHint:'Se resta vuoto, scorri YouTube una volta e premi aggiorna.', next:'Avanti', previous:'Indietro', page:'Pagina' }
+    en: { collapsed:'Favorites', title:'YouTube Favorites', subtitle:'Always on top on YouTube', whatsNew:"What's new", related:'Related', search:'Search', favVideos:'Saved videos', channels:'Channels', add:'Add', playAll:'Play all', saveVideo:'Save video', saved:'Saved', saveChannel:'Save channel', videos:'videos', new:'new', noVideos:'No videos yet. Add a channel.', noRelated:'Open a YouTube video to see related videos.', noSaved:'No saved favorite videos yet.', remove:'Remove', emptyList:'Your local favorites channels list is empty.', placeholder:'@channel, channel ID or URL', searchPlaceholder:'Search YouTube videos...', loadFail:'Could not load extension data.', checking:'Checking new videos...', refreshErrors:'Refresh with errors', refreshOk:'Refresh OK. New', enterChannel:'Enter @handle, URL or UC...', looking:'Looking up channel...', deleted:'Channel removed.', deleting:'Removing channel...', exists:'Channel already exists.', added:'Added', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Type a search term and press Search.', searching:'Searching...', noSearch:'No results.', positionSaved:'Position saved.', accessibilityToggle:'Accessibility', theaterToggle:'Theater mode', openSettings:'Open settings', onlineUsers:'online users', onlineUsersUnavailable:'online stats off', relatedLoading:'Loading related videos...', relatedHint:'If this stays empty, scroll the YouTube page once and press refresh.', next:'Next', previous:'Previous', page:'Page', history:'History', noHistory:'No viewed history yet.', clearHistory:'Clear history' },
+    ro: { collapsed:'Favorite', title:'Favorite YouTube', subtitle:'Always on top pe YouTube', whatsNew:"What's new", related:'Related', search:'Caută', favVideos:'Video favorite', channels:'Canale', add:'Adaugă', playAll:'Play all', saveVideo:'Salvează video', saved:'Salvat', saveChannel:'Salvează canal', videos:'video-uri', new:'noi', noVideos:'Nu există video-uri încă. Adaugă un canal.', noRelated:'Deschide un video YouTube ca să apară video-uri asemănătoare.', noSaved:'Nu ai video-uri favorite salvate.', remove:'Șterge', emptyList:'Lista locală de canale favorite este goală.', placeholder:'@canal, channel ID sau URL', searchPlaceholder:'Caută video-uri pe YouTube...', loadFail:'Nu pot încărca datele extensiei.', checking:'Verific noutățile...', refreshErrors:'Refresh cu erori', refreshOk:'Refresh OK. Noi', enterChannel:'Introdu @handle, URL sau UC...', looking:'Caut canalul...', deleted:'Canal șters.', deleting:'Șterg canalul...', exists:'Canalul exista deja.', added:'Adăugat', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Scrie un termen și apasă Caută.', searching:'Caut...', noSearch:'Nu am găsit rezultate.', positionSaved:'Poziție salvată.', accessibilityToggle:'Accesibilitate', theaterToggle:'Mod cinema', openSettings:'Deschide setările', onlineUsers:'utilizatori online', onlineUsersUnavailable:'statistici online oprite', relatedLoading:'Încarc video-uri asemănătoare...', relatedHint:'Dacă rămâne gol, fă scroll o dată în pagina YouTube și apasă refresh.', history:'Istoric', noHistory:'Nu există istoric de vizionare încă.', clearHistory:'Șterge istoricul' },
+    de: { collapsed:'Favoriten', title:'YouTube Favoriten', subtitle:'Immer oben auf YouTube', whatsNew:'Neu', related:'Ähnlich', search:'Suche', favVideos:'Gespeichert', channels:'Kanäle', add:'Hinzufügen', playAll:'Alle abspielen', saveVideo:'Video speichern', saved:'Gespeichert', saveChannel:'Kanal speichern', videos:'Videos', new:'neu', noVideos:'Noch keine Videos.', noRelated:'Öffne ein YouTube-Video.', noSaved:'Keine gespeicherten Videos.', remove:'Entfernen', emptyList:'Kanalliste ist leer.', placeholder:'@Kanal, ID oder URL', searchPlaceholder:'YouTube suchen...', loadFail:'Daten konnten nicht geladen werden.', checking:'Prüfe neue Videos...', refreshErrors:'Refresh mit Fehlern', refreshOk:'Refresh OK. Neu', enterChannel:'@Handle, URL oder UC... eingeben', looking:'Suche Kanal...', deleted:'Kanal entfernt.', deleting:'Entferne Kanal...', exists:'Kanal existiert bereits.', added:'Hinzugefügt', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Suchbegriff eingeben.', searching:'Suche...', noSearch:'Keine Ergebnisse.', positionSaved:'Position gespeichert.', accessibilityToggle:'Barrierefrei', theaterToggle:'Kinomodus', openSettings:'Einstellungen öffnen', relatedLoading:'Ähnliche Videos werden geladen...', relatedHint:'Wenn die Liste leer bleibt, scrolle YouTube einmal und drücke Refresh.', history:'Verlauf', noHistory:'Noch kein Wiedergabeverlauf.', clearHistory:'Verlauf löschen' },
+    fr: { collapsed:'Favoris', title:'Favoris YouTube', subtitle:'Toujours visible sur YouTube', whatsNew:'Nouveautés', related:'Similaires', search:'Recherche', favVideos:'Vidéos sauvées', channels:'Chaînes', add:'Ajouter', playAll:'Tout lire', saveVideo:'Sauver vidéo', saved:'Sauvé', saveChannel:'Sauver chaîne', videos:'vidéos', new:'nouveau', noVideos:'Aucune vidéo.', noRelated:'Ouvrez une vidéo YouTube.', noSaved:'Aucune vidéo sauvée.', remove:'Supprimer', emptyList:'Liste vide.', placeholder:'@chaîne, ID ou URL', searchPlaceholder:'Rechercher sur YouTube...', loadFail:'Impossible de charger.', checking:'Recherche...', refreshErrors:'Erreurs', refreshOk:'OK. Nouveau', enterChannel:'Entrez @handle, URL ou UC...', looking:'Recherche chaîne...', deleted:'Chaîne supprimée.', deleting:'Suppression...', exists:'Déjà existante.', added:'Ajouté', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Entrez une recherche.', searching:'Recherche...', noSearch:'Aucun résultat.', positionSaved:'Position sauvée.', accessibilityToggle:'Accessibilité', theaterToggle:'Mode cinéma', openSettings:'Ouvrir les paramètres', relatedLoading:'Chargement des vidéos similaires...', relatedHint:'Si la liste reste vide, faites défiler YouTube puis actualisez.', next:'Suivant', previous:'Précédent', page:'Page', history:'History', noHistory:'No viewed history yet.', clearHistory:'Clear history' },
+    es: { collapsed:'Favoritos', title:'Favoritos YouTube', subtitle:'Siempre encima en YouTube', whatsNew:'Novedades', related:'Relacionados', search:'Buscar', favVideos:'Vídeos guardados', channels:'Canales', add:'Añadir', playAll:'Reproducir todo', saveVideo:'Guardar vídeo', saved:'Guardado', saveChannel:'Guardar canal', videos:'vídeos', new:'nuevo', noVideos:'No hay vídeos.', noRelated:'Abre un vídeo de YouTube.', noSaved:'No hay vídeos guardados.', remove:'Eliminar', emptyList:'Lista vacía.', placeholder:'@canal, ID o URL', searchPlaceholder:'Buscar en YouTube...', loadFail:'No se pudo cargar.', checking:'Buscando...', refreshErrors:'Errores', refreshOk:'OK. Nuevo', enterChannel:'Introduce @handle, URL o UC...', looking:'Buscando canal...', deleted:'Canal eliminado.', deleting:'Eliminando...', exists:'Ya existe.', added:'Añadido', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Escribe una búsqueda.', searching:'Buscando...', noSearch:'Sin resultados.', positionSaved:'Posición guardada.', accessibilityToggle:'Accesibilidad', theaterToggle:'Modo cine', openSettings:'Abrir ajustes', relatedLoading:'Cargando vídeos relacionados...', relatedHint:'Si sigue vacío, desplaza YouTube una vez y pulsa actualizar.', next:'Siguiente', previous:'Anterior', page:'Página', history:'Historial', noHistory:'Sin historial.', clearHistory:'Borrar historial' },
+    it: { collapsed:'Preferiti', title:'Preferiti YouTube', subtitle:'Sempre in primo piano', whatsNew:'Novità', related:'Correlati', search:'Cerca', favVideos:'Video salvati', channels:'Canali', add:'Aggiungi', playAll:'Riproduci tutti', saveVideo:'Salva video', saved:'Salvato', saveChannel:'Salva canale', videos:'video', new:'nuovo', noVideos:'Nessun video.', noRelated:'Apri un video YouTube.', noSaved:'Nessun video salvato.', remove:'Rimuovi', emptyList:'Lista vuota.', placeholder:'@canale, ID o URL', searchPlaceholder:'Cerca su YouTube...', loadFail:'Errore caricamento.', checking:'Controllo...', refreshErrors:'Errori', refreshOk:'OK. Nuovo', enterChannel:'Inserisci @handle, URL o UC...', looking:'Cerco canale...', deleted:'Canale rimosso.', deleting:'Rimozione...', exists:'Esiste già.', added:'Aggiunto', viewed:'viewed', viewing:'still viewing', notViewed:'not viewed', searchFirst:'Scrivi una ricerca.', searching:'Cerco...', noSearch:'Nessun risultato.', positionSaved:'Posizione salvata.', accessibilityToggle:'Accessibilità', theaterToggle:'Modalità cinema', openSettings:'Apri impostazioni', relatedLoading:'Carico video correlati...', relatedHint:'Se resta vuoto, scorri YouTube una volta e premi aggiorna.', next:'Avanti', previous:'Indietro', page:'Pagina', history:'Cronologia', noHistory:'Nessuna cronologia.', clearHistory:'Cancella cronologia' }
   };
   const t = k => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k;
   const send = (type, payload = {}) => chrome.runtime.sendMessage({ type, ...payload });
@@ -358,12 +361,12 @@
     setInterval(() => send('onlineHeartbeat').then(() => loadState()).catch(() => null), 60000);
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
-      const shouldReload = changes.videos || changes.channels || changes.seenVideoIds || changes.settings || changes.videoStatuses || changes.favoriteVideos || changes.overlayPosition || changes.onlineStats;
+      const shouldReload = changes.videos || changes.channels || changes.seenVideoIds || changes.settings || changes.videoStatuses || changes.favoriteVideos || changes.viewedHistory || changes.savedChannelVideoIds || changes.overlayPosition || changes.onlineStats;
       if (!shouldReload) return;
 
       // v1.4.7: Save actions already update the visible card optimistically.
       // Do not aggressively rebuild the whole list immediately, because that jumps the scroll position.
-      const isListChange = changes.videos || changes.channels || changes.favoriteVideos || changes.videoStatuses;
+      const isListChange = changes.videos || changes.channels || changes.favoriteVideos || changes.viewedHistory || changes.savedChannelVideoIds || changes.videoStatuses;
       if (Date.now() < suppressStorageReloadUntil) {
         if (isListChange) scheduleSoftLoadState(1400);
         return;
@@ -415,7 +418,13 @@
     if (state?.ok && state.settings?.showOverlayOnYouTube === false) { shadow.innerHTML = ''; return; }
     const open = Boolean(ui.overlayOpen), accessibility = Boolean(state?.settings?.accessibilityMode);
     const pos = state?.overlayPosition;
-    const style = pos && open ? `style="left:${pos.left}px;top:${pos.top}px;right:auto;"` : '';
+    // v1.5.0: when accessibility mode increases the panel width, keep it snapped
+    // to the right edge instead of preserving an old left coordinate that can
+    // make the enlarged panel look misaligned. Normal mode still respects the
+    // user's dragged position.
+    const style = accessibility && open
+      ? `style="top:${Number(pos?.top ?? 72)}px;right:12px;left:auto;"`
+      : (pos && open ? `style="left:${pos.left}px;top:${pos.top}px;right:auto;"` : '');
     shadow.innerHTML = `
       <style>${STYLE_TEXT}</style>
       <div class="fys-wrap ${accessibility ? 'fys-accessibility' : ''}">
@@ -423,13 +432,14 @@
         <section class="fys-panel ${open ? '' : 'fys-hidden'}" id="fysPanel" ${style}>
           <header class="fys-header" id="fysDragHandle">
             <div><div class="fys-title">${t('title')}</div><div class="fys-subtitle">${t('subtitle')}${renderOnlineUsersInline()}</div></div>
-            <div class="fys-actions"><button class="fys-btn" id="fysRefresh" title="Refresh">↻</button><button class="fys-btn ${state?.settings?.theaterMode ? 'active-eye' : ''}" id="fysTheater" title="${escapeAttr(t('theaterToggle'))}">🎭</button><button class="fys-btn ${accessibility ? 'active-eye' : ''}" id="fysAccessibility" title="${escapeAttr(t('accessibilityToggle'))}">👁</button><button class="fys-btn red" id="fysClose" title="Close">×</button></div>
+            <div class="fys-actions"><button class="fys-btn" id="fysSettings" title="${escapeAttr(t('openSettings'))}">⚙</button><button class="fys-btn" id="fysRefresh" title="Refresh">↻</button><button class="fys-btn ${state?.settings?.theaterMode ? 'active-eye' : ''}" id="fysTheater" title="${escapeAttr(t('theaterToggle'))}">🎭</button><button class="fys-btn ${accessibility ? 'active-eye' : ''}" id="fysAccessibility" title="${escapeAttr(t('accessibilityToggle'))}">👁</button><button class="fys-btn red" id="fysClose" title="Close">×</button></div>
           </header>
           <nav class="fys-tabs">
             <button class="fys-tab ${ui.overlayTab === 'feed' ? 'active' : ''}" data-tab="feed">${t('whatsNew')}</button>
             <button class="fys-tab ${ui.overlayTab === 'related' ? 'active' : ''}" data-tab="related">${t('related')}</button>
             <button class="fys-tab ${ui.overlayTab === 'search' ? 'active' : ''}" data-tab="search">${t('search')}</button>
             <button class="fys-tab ${ui.overlayTab === 'favvideos' ? 'active' : ''}" data-tab="favvideos">${t('favVideos')}</button>
+            <button class="fys-tab ${ui.overlayTab === 'history' ? 'active' : ''}" data-tab="history">${t('history')}</button>
             <button class="fys-tab ${ui.overlayTab === 'channels' ? 'active' : ''}" data-tab="channels">${t('channels')}</button>
           </nav>
           <div class="fys-body"><div id="fysStatus" class="fys-status ${isError ? 'error' : ''}">${escapeHtml(statusText || (!state?.ok ? state?.error || 'Error' : ''))}</div>${renderActiveTab()}</div>
@@ -498,6 +508,7 @@
     if (ui.overlayTab === 'search') return renderSearchTab();
     if (ui.overlayTab === 'related') return renderRelatedTab();
     if (ui.overlayTab === 'favvideos') return renderFavoriteVideosTab();
+    if (ui.overlayTab === 'history') return renderHistoryTab();
     return renderFeedTab();
   }
   function renderFeedTab() {
@@ -521,6 +532,11 @@
     const videos = state.favoriteVideos || [];
     const page = getPage('favvideos', videos.length), pageVideos = paginate('favvideos', videos);
     return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="favvideos">▶ ${t('playAll')}</button></div>${renderPagination('favvideos', videos.length)}${videos.length ? pageVideos.map(v => renderVideo(v, true, { removeFav: true, channel: true })).join('') : `<div class="fys-empty">${t('noSaved')}</div>`}`;
+  }
+  function renderHistoryTab() {
+    const videos = state.viewedHistory || [];
+    const page = getPage('history', videos.length), pageVideos = paginate('history', videos);
+    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="history">▶ ${t('playAll')}</button><button class="fys-btn red" id="fysClearHistory">${t('clearHistory')}</button></div>${renderPagination('history', videos.length)}${videos.length ? pageVideos.map(v => renderVideo(v, true, { save: true, channel: true })).join('') : `<div class="fys-empty">${t('noHistory')}</div>`}`;
   }
   function totalPages(count) { return Math.max(1, Math.ceil(Number(count || 0) / PAGE_SIZE)); }
   function getPage(kind, count) {
@@ -569,10 +585,11 @@
     $('fysOpen')?.addEventListener('click', async () => { ui.overlayOpen = true; await storageSet({ overlayOpen: true }); render(); });
     $('fysClose')?.addEventListener('click', async () => { ui.overlayOpen = false; await storageSet({ overlayOpen: false }); render(); });
     $('fysRefresh')?.addEventListener('click', async () => { await updateCurrentVideoStatus(); if (ui.overlayTab === 'related') await refreshRelatedVideos(true); await refresh(); });
+    $('fysSettings')?.addEventListener('click', openExtensionSettings);
     $('fysAccessibility')?.addEventListener('click', toggleAccessibilityMode);
     $('fysTheater')?.addEventListener('click', toggleTheaterMode);
     shadow.querySelectorAll('.fys-tab').forEach(btn => btn.addEventListener('click', async () => { ui.overlayTab = btn.dataset.tab; await storageSet({ overlayTab: ui.overlayTab }); if (ui.overlayTab === 'related') await refreshRelatedVideos(true); else render(); }));
-    shadow.querySelectorAll('[data-video-id]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const id = a.getAttribute('data-video-id'); if (id) await send('markVideoViewing', { videoId: id }); await navigateToVideo(a.href); }));
+    shadow.querySelectorAll('[data-video-id]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const id = a.getAttribute('data-video-id'); if (id) await send('markVideoViewing', { videoId: id, video: findVideoById(id) }); await navigateToVideo(a.href); }));
     shadow.querySelectorAll('[data-nav]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); location.href = a.getAttribute('data-nav'); }));
     shadow.querySelectorAll('[data-play-list]').forEach(btn => btn.addEventListener('click', () => playAll(btn.getAttribute('data-play-list'))));
     shadow.querySelectorAll('[data-page-number]').forEach(btn => btn.addEventListener('click', async () => setPage(btn.getAttribute('data-page-kind'), Number(btn.getAttribute('data-page-number')))));
@@ -583,6 +600,7 @@
     shadow.querySelectorAll('[data-remove-channel]').forEach(btn => btn.addEventListener('click', async () => { render(t('deleting')); const res = await send('removeChannel', { channelId: btn.getAttribute('data-remove-channel') }); await loadState(); render(res.ok ? t('deleted') : res.error, !res.ok); }));
     $('fysAddChannel')?.addEventListener('click', addChannelFromOverlay);
     $('fysChannelInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') addChannelFromOverlay(); });
+    $('fysClearHistory')?.addEventListener('click', clearHistory);
     $('fysSearchBtn')?.addEventListener('click', searchVideos);
     $('fysSearchInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') searchVideos(); });
     const handle = $('fysDragHandle'); if (handle) { handle.addEventListener('mousedown', startDrag); handle.addEventListener('touchstart', startDrag, { passive: false }); }
@@ -594,11 +612,20 @@
     render();
   }
   async function changePage(kind, action) {
-    const lists = { feed: state?.videos || [], related: relatedVideos || [], search: searchResults || [], favvideos: state?.favoriteVideos || [] };
+    const lists = { feed: state?.videos || [], related: relatedVideos || [], search: searchResults || [], favvideos: state?.favoriteVideos || [], history: state?.viewedHistory || [] };
     const current = getPage(kind, (lists[kind] || []).length);
     const next = action === 'next' ? current + 1 : current - 1;
     await setPage(kind, Math.min(totalPages((lists[kind] || []).length), Math.max(1, next)));
   }
+  async function openExtensionSettings() {
+    try {
+      const res = await send('openSettings');
+      if (!res?.ok) render(res?.error || 'Could not open settings.', true);
+    } catch (err) {
+      render(String(err?.message || err), true);
+    }
+  }
+
   async function addChannelFromOverlay() {
     const input = shadow.getElementById('fysChannelInput')?.value.trim(); if (!input) return render(t('enterChannel'), true);
     render(t('looking')); const res = await send('addChannel', { input }); await loadState(); render(res.ok ? (res.duplicate ? t('exists') : `${t('added')}: ${res.channel.title}`) : res.error, !res.ok);
@@ -661,7 +688,7 @@
         return false;
       }
 
-      await send('markVideoViewing', { videoId });
+      await send('markVideoViewing', { videoId, video: findVideoById(videoId) });
       lastUrl = location.href;
       lastRelatedVideoId = videoId;
       await restoreRelatedFromCache();
@@ -761,16 +788,19 @@
   async function saveVideoById(videoId, btn) {
     const v = findVideoById(videoId);
     if (!v) return;
-    suppressStorageReloadUntil = Date.now() + 4500;
+    suppressStorageReloadUntil = Date.now() + 7000;
+    optimisticSavedVideoIds.add(videoId);
     if (btn) {
       btn.textContent = t('saved');
       btn.setAttribute('aria-label', t('saved'));
       btn.classList.add('saved');
+      btn.disabled = true;
     }
     const res = await send('addFavoriteVideo', { video: v });
     if (!res?.ok) return render(res?.error || 'Could not save video.', true);
     if (Array.isArray(res.favoriteVideos)) state.favoriteVideos = res.favoriteVideos;
     else state.favoriteVideos = [v, ...(state.favoriteVideos || []).filter(x => x.videoId !== v.videoId)].slice(0, 500);
+    // Soft-render from local state only. Do not force a full state reload here.
     render();
   }
 
@@ -778,28 +808,41 @@
     const v = findVideoById(videoId);
     const input = v?.channelId || v?.channelUrl;
     if (!input) return render('No channel ID/URL found for this video.', true);
-    suppressStorageReloadUntil = Date.now() + 5500;
+    suppressStorageReloadUntil = Date.now() + 9000;
+    optimisticSavedChannelVideoIds.add(videoId);
     if (btn) {
       btn.textContent = t('saved');
       btn.setAttribute('aria-label', t('saved'));
       btn.classList.add('saved');
+      btn.disabled = true;
     }
     const res = await send('addChannel', { input });
     if (!res?.ok) return render(res?.error || 'Could not save channel.', true);
     if (res.channel && !isFavoriteChannel(res.channel)) {
       state.channels = [...(state.channels || []), res.channel];
     }
+    state.savedChannelVideoIds = { ...(state.savedChannelVideoIds || {}), [videoId]: res.channel?.channelId || input };
+    await storageSet({ savedChannelVideoIds: state.savedChannelVideoIds });
     render();
-    scheduleSoftLoadState(1800);
+  }
+
+  async function clearHistory() {
+    suppressStorageReloadUntil = Date.now() + 4000;
+    const res = await send('clearViewedHistory');
+    if (!res?.ok) return render(res?.error || 'Could not clear history.', true);
+    state.viewedHistory = [];
+    render();
   }
 
   function findVideoById(videoId) { return [...(state?.videos || []), ...(state?.favoriteVideos || []), ...relatedVideos, ...searchResults].find(v => v.videoId === videoId); }
-  function isFavoriteVideo(videoId) { return (state?.favoriteVideos || []).some(v => v.videoId === videoId); }
+  function isFavoriteVideo(videoId) { return optimisticSavedVideoIds.has(videoId) || (state?.favoriteVideos || []).some(v => v.videoId === videoId); }
   function isFavoriteChannel(v) {
+    if (v?.videoId && (optimisticSavedChannelVideoIds.has(v.videoId) || state?.savedChannelVideoIds?.[v.videoId])) return true;
     const list = state?.channels || [];
     const id = String(v?.channelId || '').trim();
     const url = String(v?.channelUrl || v?.url || '').trim();
-    return list.some(c => (id && c.channelId === id) || (url && (c.url === url || c.channelUrl === url)));
+    const title = String(v?.channelTitle || '').trim().toLowerCase();
+    return list.some(c => (id && c.channelId === id) || (url && (c.url === url || c.channelUrl === url)) || (title && String(c.title || '').trim().toLowerCase() === title));
   }
   function playAll(kind) {
     let list = [];
@@ -807,9 +850,10 @@
     if (kind === 'related') list = relatedVideos || [];
     if (kind === 'search') list = searchResults || [];
     if (kind === 'favvideos') list = state?.favoriteVideos || [];
+    if (kind === 'history') list = state?.viewedHistory || [];
     const ids = list.map(v => v.videoId).filter(Boolean).slice(0, 50);
     if (!ids.length) return;
-    send('markVideoViewing', { videoId: ids[0] });
+    send('markVideoViewing', { videoId: ids[0], video: list.find(v => v.videoId === ids[0]) });
     navigateToVideo(`https://www.youtube.com/watch_videos?video_ids=${encodeURIComponent(ids.join(','))}`);
   }
 
@@ -891,7 +935,7 @@
         const id = getCurrentVideoId();
         if (!id) return;
         const duration = Number(video.duration || 0), current = Number(video.currentTime || 0);
-        if (video.ended || (duration > 30 && current / duration >= 0.95)) await send('markVideoViewed', { videoId: id });
+        if (video.ended || (duration > 30 && current / duration >= 0.95)) await send('markVideoViewed', { videoId: id, video: findVideoById(id) });
       };
       video.addEventListener('ended', markViewedIfComplete, true);
       video.addEventListener('timeupdate', () => { if (video.duration && video.currentTime / video.duration >= 0.95) markViewedIfComplete(); }, true);

@@ -11,7 +11,7 @@ const I18N = {
     placeholder: '@channel, channel ID or YouTube URL', loadError: 'Loading error.', videos: 'videos', new: 'new', noVideos: 'No videos yet. Add a channel.',
     checked: 'checked', remove: 'Remove', emptyList: 'Your local favorites list is empty.', deleting: 'Removing channel...', removed: 'Channel removed.',
     enterChannel: 'Enter @handle, channel ID or YouTube URL.', looking: 'Looking up channel...', exists: 'Channel already exists.', added: 'Added', refreshing: 'Checking new videos...',
-    refreshErrors: 'Refresh with errors', refreshOk: 'Refresh OK. New', allSeen: 'All marked as seen.', saved: 'Settings saved.', showOverlay: 'Show floating panel on YouTube', accessibilityMode: 'Accessibility mode / impaired eyesight', theaterMode: 'Open videos in theater mode', githubRepo: 'GitHub repo for updates', githubUpdateCheck: 'Check GitHub for updates automatically', checkUpdate: 'Check update now', updateAvailable: 'Update available', noUpdate: 'No update available', updateCheckFailed: 'Update check failed', onlineUsersEnabled: 'Enable online users counter', onlineUsersEndpoint: 'Online users endpoint', checkOnline: 'Check online now', usersOnline: 'users online', onlineDisabled: 'Online counter disabled', onlineFailed: 'Online check failed', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed'
+    refreshErrors: 'Refresh with errors', refreshOk: 'Refresh OK. New', allSeen: 'All marked as seen.', saved: 'Settings saved.', showOverlay: 'Show floating panel on YouTube', accessibilityMode: 'Accessibility mode / impaired eyesight', theaterMode: 'Open videos in theater mode', githubRepo: 'GitHub repo for updates', githubUpdateCheck: 'Check GitHub for updates automatically', checkUpdate: 'Check update now', updateAvailable: 'Update available', noUpdate: 'No update available', updateCheckFailed: 'Update check failed', onlineUsersEnabled: 'Enable online users counter', onlineUsersEndpoint: 'Online users endpoint', checkOnline: 'Check online now', usersOnline: 'users online', exportData: 'Export backup', importData: 'Import backup', exportOk: 'Backup exported', importOk: 'Backup imported', onlineDisabled: 'Online counter disabled', onlineFailed: 'Online check failed', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed'
   },
   ro: {
     appTitle: 'Favorite YouTube', appSubtitle: 'Favorite YouTube locale, fără subscribe real.',
@@ -21,7 +21,7 @@ const I18N = {
     placeholder: '@canal, channel ID sau URL YouTube', loadError: 'Eroare la încărcare.', videos: 'video-uri', new: 'noi', noVideos: 'Nu există video-uri încă. Adaugă un canal.',
     checked: 'verificat', remove: 'Șterge', emptyList: 'Lista ta locală de favorite este goală.', deleting: 'Șterg canalul...', removed: 'Canal șters.',
     enterChannel: 'Introdu @handle, channel ID sau URL YouTube.', looking: 'Caut canalul...', exists: 'Canalul exista deja.', added: 'Adăugat', refreshing: 'Verific noutățile...',
-    refreshErrors: 'Refresh cu erori', refreshOk: 'Refresh OK. Noi', allSeen: 'Toate marcate ca citite.', saved: 'Setări salvate.', showOverlay: 'Afișează panoul flotant pe YouTube', accessibilityMode: 'Mod accesibilitate / vedere slabă', theaterMode: 'Deschide video-urile în mod cinema', githubRepo: 'Repo GitHub pentru update-uri', githubUpdateCheck: 'Verifică automat update-uri pe GitHub', checkUpdate: 'Verifică update acum', updateAvailable: 'Update disponibil', noUpdate: 'Nu există update disponibil', updateCheckFailed: 'Verificarea update-ului a eșuat', onlineUsersEnabled: 'Activează contor utilizatori online', onlineUsersEndpoint: 'Endpoint utilizatori online', checkOnline: 'Verifică online acum', usersOnline: 'utilizatori online', onlineDisabled: 'Contor online oprit', onlineFailed: 'Verificare online eșuată', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed'
+    refreshErrors: 'Refresh cu erori', refreshOk: 'Refresh OK. Noi', allSeen: 'Toate marcate ca citite.', saved: 'Setări salvate.', showOverlay: 'Afișează panoul flotant pe YouTube', accessibilityMode: 'Mod accesibilitate / vedere slabă', theaterMode: 'Deschide video-urile în mod cinema', githubRepo: 'Repo GitHub pentru update-uri', githubUpdateCheck: 'Verifică automat update-uri pe GitHub', checkUpdate: 'Verifică update acum', updateAvailable: 'Update disponibil', noUpdate: 'Nu există update disponibil', updateCheckFailed: 'Verificarea update-ului a eșuat', onlineUsersEnabled: 'Activează contor utilizatori online', onlineUsersEndpoint: 'Endpoint utilizatori online', checkOnline: 'Verifică online acum', usersOnline: 'utilizatori online', exportData: 'Export backup', importData: 'Import backup', exportOk: 'Backup exportat', importOk: 'Backup importat', onlineDisabled: 'Contor online oprit', onlineFailed: 'Verificare online eșuată', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed'
   },
   de: { appTitle: 'YouTube Favoriten', appSubtitle: 'Lokale Kanal-Favoriten, kein echtes YouTube-Abo.', add: 'Hinzufügen', whatsNew: 'Neuigkeiten', channels: 'Kanäle', settings: 'Einstellungen', markSeen: 'Gesehen markieren', language: 'Sprache', checkEvery: 'Prüfen alle Minuten', videosPerChannel: 'Videos pro Kanal', notifications: 'Benachrichtigungen für neue Videos', showOverlay: 'Schwebendes Panel auf YouTube anzeigen', accessibilityMode: 'Barrierefreier Modus / Sehschwäche', theaterMode: 'Videos im Kinomodus öffnen', githubRepo: 'GitHub repo for updates', githubUpdateCheck: 'Check GitHub for updates automatically', checkUpdate: 'Check update now', updateAvailable: 'Update available', noUpdate: 'No update available', updateCheckFailed: 'Update check failed', saveSettings: 'Einstellungen speichern', privacyHint: 'Die Erweiterung nutzt dein YouTube-Konto nicht.', placeholder: '@Kanal, Channel ID oder YouTube URL', loadError: 'Ladefehler.', videos: 'Videos', new: 'neu', noVideos: 'Noch keine Videos. Füge einen Kanal hinzu.', checked: 'geprüft', remove: 'Entfernen', emptyList: 'Deine lokale Favoritenliste ist leer.', deleting: 'Entferne Kanal...', removed: 'Kanal entfernt.', enterChannel: '@Handle, Channel ID oder YouTube URL eingeben.', looking: 'Suche Kanal...', exists: 'Kanal existiert bereits.', added: 'Hinzugefügt', refreshing: 'Prüfe neue Videos...', refreshErrors: 'Refresh mit Fehlern', refreshOk: 'Refresh OK. Neu', allSeen: 'Alle als gesehen markiert.', saved: 'Einstellungen gespeichert.', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed' },
   fr: { appTitle: 'Favoris YouTube', appSubtitle: 'Favoris locaux, sans abonnement YouTube réel.', add: 'Ajouter', whatsNew: 'Nouveautés', channels: 'Chaînes', settings: 'Paramètres', markSeen: 'Marquer vu', language: 'Langue', checkEvery: 'Vérifier toutes les minutes', videosPerChannel: 'Vidéos par chaîne', notifications: 'Notifications pour nouvelles vidéos', showOverlay: 'Afficher le panneau flottant sur YouTube', accessibilityMode: 'Mode accessibilité / basse vision', theaterMode: 'Ouvrir les vidéos en mode cinéma', githubRepo: 'GitHub repo for updates', githubUpdateCheck: 'Check GitHub for updates automatically', checkUpdate: 'Check update now', updateAvailable: 'Update available', noUpdate: 'No update available', updateCheckFailed: 'Update check failed', saveSettings: 'Enregistrer', privacyHint: 'L’extension n’utilise pas votre compte YouTube.', placeholder: '@chaîne, ID ou URL YouTube', loadError: 'Erreur de chargement.', videos: 'vidéos', new: 'nouveau', noVideos: 'Aucune vidéo. Ajoutez une chaîne.', checked: 'vérifié', remove: 'Supprimer', emptyList: 'Votre liste locale est vide.', deleting: 'Suppression...', removed: 'Chaîne supprimée.', enterChannel: 'Entrez @handle, ID ou URL YouTube.', looking: 'Recherche de la chaîne...', exists: 'La chaîne existe déjà.', added: 'Ajouté', refreshing: 'Recherche de nouvelles vidéos...', refreshErrors: 'Actualisation avec erreurs', refreshOk: 'Actualisation OK. Nouveau', allSeen: 'Tout marqué comme vu.', saved: 'Paramètres enregistrés.', viewed: 'viewed', viewing: 'still viewing', notViewed: 'not viewed' },
@@ -89,12 +89,24 @@ function renderSettings() {
 }
 function bind() {
   $('addBtn').addEventListener('click', addChannel); $('channelInput').addEventListener('keydown', e => { if (e.key === 'Enter') addChannel(); });
-  $('refreshBtn').addEventListener('click', refresh); $('markSeenBtn').addEventListener('click', markSeen); $('saveSettingsBtn').addEventListener('click', saveSettings); $('checkUpdateBtn').addEventListener('click', checkUpdate); $('checkOnlineBtn').addEventListener('click', checkOnline);
+  $('refreshBtn').addEventListener('click', refresh); $('markSeenBtn').addEventListener('click', markSeen); $('saveSettingsBtn').addEventListener('click', saveSettings); $('checkUpdateBtn').addEventListener('click', checkUpdate); $('checkOnlineBtn').addEventListener('click', checkOnline); $('exportDataBtn')?.addEventListener('click', exportBackup); $('importDataBtn')?.addEventListener('click', () => $('importDataFile')?.click()); $('importDataFile')?.addEventListener('change', importBackup);
   $('language').addEventListener('change', () => { lang = detectLang($('language').value); applyI18n(); renderVideos(); renderChannels(); });
-  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab,.panel').forEach(x => x.classList.remove('active')); tab.classList.add('active'); $(tab.dataset.tab).classList.add('active');
-  }));
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+  window.addEventListener('hashchange', activateTabFromHash);
 }
+function activateTab(tabName) {
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  const panel = tabName ? $(tabName) : null;
+  if (!tab || !panel) return;
+  document.querySelectorAll('.tab,.panel').forEach(x => x.classList.remove('active'));
+  tab.classList.add('active');
+  panel.classList.add('active');
+}
+function activateTabFromHash() {
+  const requested = String(location.hash || '').replace(/^#/, '');
+  if (requested) activateTab(requested);
+}
+
 async function addChannel() {
   const input = $('channelInput').value.trim(); if (!input) return setStatus(t('enterChannel'), true);
   setStatus(t('looking')); const res = await send('addChannel', { input }); if (!res.ok) return setStatus(res.error, true);
@@ -150,7 +162,41 @@ async function checkOnline() {
   setStatus(`${Number(res.onlineUsers || 0)} ${t('usersOnline')}`);
 }
 
+
+async function exportBackup() {
+  const res = await send('exportData');
+  if (!res.ok) return setStatus(res.error, true);
+  const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `youtube-favorites-feed-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus(t('exportOk'));
+}
+
+async function importBackup(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const res = await send('importData', { data: json });
+    if (!res.ok) return setStatus(res.error, true);
+    await load();
+    setStatus(`${t('importOk')}: ${res.importedKeys?.join(', ') || ''}`);
+  } catch (err) {
+    setStatus(String(err?.message || err), true);
+  } finally {
+    if (event?.target) event.target.value = '';
+  }
+}
+
 function formatDate(value) { if (!value) return ''; const d = new Date(value); return Number.isNaN(d.getTime()) ? value : d.toLocaleString(lang === 'ro' ? 'ro-RO' : lang === 'de' ? 'de-DE' : lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : lang === 'it' ? 'it-IT' : 'en-US'); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); }
 function escapeAttr(s) { return escapeHtml(s); }
-bind(); load();
+bind(); load().then(activateTabFromHash);
