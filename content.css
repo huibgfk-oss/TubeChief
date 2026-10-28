@@ -285,3 +285,16 @@
 .fys-accessibility .fys-pagination { gap: 7px; }
 .fys-accessibility .fys-page-btn { font-size: 14px; padding: 8px 11px; border: 1px solid rgba(255,255,255,.75); }
 .fys-accessibility .fys-list-note { color: #fff; font-size: 14px; }
+
+/* TubeChief overlay visibility + input contrast fix */
+:host, .fys-wrap, .fys-panel, .fys-collapsed { z-index: 2147483647 !important; }
+.fys-panel { max-width: calc(100dvw - 16px) !important; }
+.fys-header { position: relative; z-index: 2; flex-shrink: 0; }
+.fys-tabs { position: relative; z-index: 1; flex-shrink: 0; }
+.fys-row input#fysSearchInput, .fys-row input#fysChannelInput {
+  min-width: 0;
+  color: #eee !important;
+  -webkit-text-fill-color: #eee !important;
+  opacity: 1 !important;
+  caret-color: #fff !important;
+}
