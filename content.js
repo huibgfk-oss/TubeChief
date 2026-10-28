@@ -297,6 +297,30 @@
 .fys-accessibility .fys-page-btn { font-size: 14px; padding: 8px 11px; border: 1px solid rgba(255,255,255,.75); }
 .fys-accessibility .fys-list-note { color: #fff; font-size: 14px; }
 
+/* TubeChief 1.5.7: controls are part of the real layout, never moved by an observer. */
+.fys-footer {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  border-top: 1px solid #343434;
+  background: #151515;
+}
+.fys-footer:empty { display: none; }
+.fys-footer .fys-pagination {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin: 0;
+  width: max-content;
+  max-width: 100%;
+}
+.fys-footer .fys-page-btn { flex: 0 0 auto; }
+.fys-footer .tc-more-related { margin-top: 7px; }
+
+
 /* TubeChief overlay visibility + input contrast fix */
 :host, .fys-wrap, .fys-panel, .fys-collapsed { z-index: 2147483647 !important; }
 .fys-panel { max-width: calc(100dvw - 16px) !important; }
@@ -542,9 +566,11 @@
             <button class="fys-tab ${ui.overlayTab === 'channels' ? 'active' : ''}" data-tab="channels">${t('channels')}</button>
           </nav>
           <div class="fys-body"><div id="fysStatus" class="fys-status ${isError ? 'error' : ''}">${escapeHtml(statusText || (!state?.ok ? state?.error || 'Error' : ''))}</div>${renderActiveTab()}</div>
+          <footer class="fys-footer" id="fysFooter">${tcRenderFooterPagination()}</footer>
         </section>
       </div>`;
     bindUi();
+    requestAnimationFrame(tcClampOverlayPanel);
     restoreTubeChiefInputs(inputSnapshot);
     fitTubeChiefOverlay();
     restorePanelScrollIfNeeded();
@@ -603,6 +629,90 @@
     return ` · ${t('onlineUsersUnavailable')}`;
   }
 
+
+  function tcRenderFooterPagination() {
+    if (!state?.ok) return '';
+    const tab = ui.overlayTab;
+    const sizes = {
+      feed: (state.videos || []).length,
+      related: (relatedVideos || []).length,
+      search: (searchResults || []).length,
+      favvideos: (state.favoriteVideos || []).length
+    };
+    return Object.prototype.hasOwnProperty.call(sizes, tab)
+      ? renderPagination(tab, sizes[tab]) : '';
+  }
+
+
+  // TubeChief: restore the interactive overlay after YouTube native fullscreen.
+  // Keep dragging: only invalid positions are clamped during ordinary use.
+  let tcWasFullscreen = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  let tcLastPersist = '';
+  function tcClampOverlayPanel(forceRestore = false) {
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    if (!shadow || !rootHost) return;
+    const panel = shadow.getElementById('fysPanel');
+    if (!panel || panel.classList.contains('fys-hidden')) return;
+    // YouTube recreates stacking contexts on entering/leaving fullscreen.
+    // Re-anchor our fixed host to the document root and raise it above sticky headers.
+    if (rootHost.parentNode !== document.documentElement) document.documentElement.appendChild(rootHost);
+    rootHost.style.setProperty('position', 'fixed', 'important');
+    rootHost.style.setProperty('inset', '0', 'important');
+    rootHost.style.setProperty('z-index', '2147483647', 'important');
+    rootHost.style.setProperty('pointer-events', 'none', 'important');
+    const vv = window.visualViewport;
+    const vw = Math.max(180, vv?.width || document.documentElement.clientWidth || window.innerWidth);
+    const vh = Math.max(140, vv?.height || window.innerHeight);
+    const ox = vv?.offsetLeft || 0;
+    const oy = vv?.offsetTop || 0;
+    const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    const margin = 8;
+    const safeTop = mobile ? oy + 8 : oy + (vh < 330 ? 8 : 80);
+    const rect = panel.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const width = Math.min(rect.width, Math.max(150, vw - 2 * margin));
+    const left = Math.max(ox + margin, Math.min(ox + vw - width - margin, rect.left));
+    const visibleMin = Math.min(290, Math.max(120, Math.round(vh * 0.48)));
+    const maxTop = Math.max(safeTop, oy + vh - visibleMin - margin);
+    // The fullscreen-exit case is special: saved coordinates may be valid
+    // numerically while YouTube's own sticky controls cover the header.
+    const top = forceRestore ? safeTop : Math.max(safeTop, Math.min(maxTop, rect.top));
+    const changed = Math.abs(rect.top - top) > 1 || Math.abs(rect.left - left) > 1;
+    panel.style.setProperty('max-width', Math.round(vw - 2 * margin) + 'px', 'important');
+    panel.style.setProperty('max-height', Math.round(Math.max(110, oy + vh - top - margin)) + 'px', 'important');
+    if (changed) {
+      panel.style.setProperty('top', Math.round(top) + 'px', 'important');
+      panel.style.setProperty('left', Math.round(left) + 'px', 'important');
+      panel.style.setProperty('right', 'auto', 'important');
+      // Keep subsequent TubeChief renders from restoring obsolete coordinates.
+      const pos = {top: Math.round(top), left: Math.round(left)};
+      if (state?.ok) state.overlayPosition = pos;
+      const key = `${pos.top}:${pos.left}`;
+      if (key !== tcLastPersist && state?.ok) {
+        tcLastPersist = key;
+        Promise.resolve(send('saveOverlayPosition', {position: pos})).catch(() => {});
+      }
+    }
+  }
+  function tcScheduleClamp(force = false) {
+    [0, 100, 400, 1100].forEach((ms, i) =>
+      setTimeout(() => tcClampOverlayPanel(force && i === 0), ms));
+  }
+  function tcFullscreenEvent() {
+    const now = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    if (tcWasFullscreen && !now) tcScheduleClamp(true);
+    else if (!now) tcScheduleClamp(false);
+    tcWasFullscreen = now;
+  }
+  document.addEventListener('fullscreenchange', tcFullscreenEvent, true);
+  document.addEventListener('webkitfullscreenchange', tcFullscreenEvent, true);
+  window.addEventListener('resize', () => tcScheduleClamp(false), {passive: true});
+  window.addEventListener('orientationchange', () => tcScheduleClamp(false), {passive: true});
+  window.addEventListener('focus', () => tcScheduleClamp(false), {passive: true});
+  window.addEventListener('pageshow', () => tcScheduleClamp(false), {passive: true});
+  document.addEventListener('yt-navigate-finish', () => tcScheduleClamp(false), true);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => tcScheduleClamp(false), {passive: true});
+
   function renderActiveTab() {
     if (!state?.ok) return '';
     if (ui.overlayTab === 'channels') return renderChannelsTab();
@@ -616,23 +726,23 @@
     const seen = new Set(state.seenVideoIds || []), videos = state.videos || [];
     const newCount = videos.filter(v => !seen.has(v.videoId)).length;
     const page = getPage('feed', videos.length), pageVideos = paginate('feed', videos);
-    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${newCount} ${t('new')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="feed">▶ ${t('playAll')}</button></div>${renderPagination('feed', videos.length)}${videos.length ? pageVideos.map(v => renderVideo(v, seen.has(v.videoId), { save: true, channel: false })).join('') : `<div class="fys-empty">${t('noVideos')}</div>`}`;
+    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${newCount} ${t('new')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="feed">▶ ${t('playAll')}</button></div>${videos.length ? pageVideos.map(v => renderVideo(v, seen.has(v.videoId), { save: true, channel: false })).join('') : `<div class="fys-empty">${t('noVideos')}</div>`}`;
   }
   function renderRelatedTab() {
     if (!location.href.includes('/watch')) return `<div class="fys-empty">${t('noRelated')}</div>`;
     const videos = relatedVideos || [];
     const page = getPage('related', videos.length), pageVideos = paginate('related', videos);
     const empty = relatedLoading ? t('relatedLoading') : `${t('noRelated')}<br><small>${t('relatedHint')}</small>`;
-    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="related">▶ ${t('playAll')}</button></div>${renderPagination('related', videos.length)}${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : `<div class="fys-empty">${empty}</div>`}`;
+    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="related">▶ ${t('playAll')}</button></div>${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : `<div class="fys-empty">${empty}</div>`}`;
   }
   function renderSearchTab() {
     const videos = searchResults || [], page = getPage('search', videos.length), pageVideos = paginate('search', videos);
-    return `<div class="fys-row fys-search-row"><input id="fysSearchInput" placeholder="${escapeAttr(t('searchPlaceholder'))}"><button class="fys-btn" id="fysSearchBtn">${t('search')}</button></div><div class="fys-toolbar"><span class="fys-count">${videos.length ? `${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}` : t('searchFirst')}</span><button class="fys-btn gray" data-play-list="search">▶ ${t('playAll')}</button></div>${renderPagination('search', videos.length)}<div id="fysSearchResults">${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : ''}</div>`;
+    return `<div class="fys-row fys-search-row"><input id="fysSearchInput" placeholder="${escapeAttr(t('searchPlaceholder'))}"><button class="fys-btn" id="fysSearchBtn">${t('search')}</button></div><div class="fys-toolbar"><span class="fys-count">${videos.length ? `${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}` : t('searchFirst')}</span><button class="fys-btn gray" data-play-list="search">▶ ${t('playAll')}</button></div><div id="fysSearchResults">${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : ''}</div>`;
   }
   function renderFavoriteVideosTab() {
     const videos = state.favoriteVideos || [];
     const page = getPage('favvideos', videos.length), pageVideos = paginate('favvideos', videos);
-    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="favvideos">▶ ${t('playAll')}</button></div>${renderPagination('favvideos', videos.length)}${videos.length ? pageVideos.map(v => renderVideo(v, true, { removeFav: true, channel: true })).join('') : `<div class="fys-empty">${t('noSaved')}</div>`}`;
+    return `<div class="fys-toolbar"><span class="fys-count">${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}</span><button class="fys-btn gray" data-play-list="favvideos">▶ ${t('playAll')}</button></div>${videos.length ? pageVideos.map(v => renderVideo(v, true, { removeFav: true, channel: true })).join('') : `<div class="fys-empty">${t('noSaved')}</div>`}`;
   }
   function renderHistoryTab() {
     const videos = state.viewedHistory || [];
