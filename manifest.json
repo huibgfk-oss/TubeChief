@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Favorites Feed",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "default_locale": "en",
   "description": "Local YouTube favorites feed with persistent history, backup export/import, online users, theater mode, build history, smoother overlay alignment and overlay settings shortcut.",
   "permissions": [

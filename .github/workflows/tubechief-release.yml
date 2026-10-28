@@ -1,0 +1,43 @@
+name: TubeChief Release (ZIP)
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify version and build extension package
+        shell: bash
+        run: |
+          python3 - <<'PYBUILD'
+          import json, os, pathlib, zipfile
+          root = pathlib.Path('.')
+          manifest = json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          tag = os.environ['GITHUB_REF_NAME']
+          if tag != 'v' + manifest['version']:
+              raise SystemExit(f'Tag {tag} mismatches manifest version {manifest["version"]}')
+          required = ['manifest.json','background.js','content.js','popup.html','popup.js','popup.css',
+                      'tubechief-updater-popup.js']
+          for p in required:
+              if not (root/p).is_file(): raise SystemExit('Missing required extension file: '+p)
+          files = required + [p for p in ['content.css', 'page-bridge.js', 'icon-16.png',
+                    'icon-48.png', 'icon-128.png'] if (root/p).is_file()]
+          files += [str(p) for p in (root/'_locales').rglob('*') if p.is_file()] if (root/'_locales').is_dir() else []
+          out = root / ('TubeChief-' + manifest['version'] + '.zip')
+          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              for f in files: z.write(root/f, arcname=f)
+          print('Created',out,'with',len(files),'files')
+          PYBUILD
+      - name: Publish stable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "TubeChief-${GITHUB_REF_NAME#v}.zip" \
+            --verify-tag --title "TubeChief ${GITHUB_REF_NAME#v}" \
+            --notes "TubeChief update notifications and browser-managed update readiness. This ZIP is for developer-mode installs. Browser-native CRX updates require a signed distribution channel."

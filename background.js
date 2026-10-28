@@ -67,6 +67,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       else if (msg?.type === 'exportData') sendResponse(await exportData());
       else if (msg?.type === 'importData') sendResponse(await importData(msg.data));
       else if (msg?.type === 'openSettings') sendResponse(await openSettingsPage());
+      else if (typeof msg?.type === 'string' && msg.type.startsWith('tubechiefUpdate')) sendResponse(await tubechiefUpdaterMessage(msg));
       else sendResponse({ ok: false, error: 'Unknown message type' });
     } catch (err) { sendResponse({ ok: false, error: String(err?.message || err) }); }
   })();
@@ -564,3 +565,149 @@ function walkJsonForVideos(node, out, max) {
   for (const v of Object.values(node)) walkJsonForVideos(v, out, max);
 }
 function decodeHtml(s) { return String(s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>'); }
+
+
+// TUBECHIEF_AUTOUPDATER_V1
+// Release notification is independent of the browser's authenticated CRX/store updater.
+// This code NEVER executes remote JavaScript or attempts to replace extension files.
+const TUBECHIEF_UPDATER_API = 'https://api.github.com/repos/huibgfk-oss/TubeChief/releases/latest';
+const TUBECHIEF_UPDATER_RELEASES = 'https://github.com/huibgfk-oss/TubeChief/releases';
+const TUBECHIEF_UPDATER_ALARM = 'tubechief-release-check';
+const TUBECHIEF_UPDATER_KEY = 'tubechiefUpdaterStateV1';
+const TUBECHIEF_UPDATER_NOTICE = 'tubechief-update-available';
+let tubechiefUpdaterRunning = null;
+
+function tubechiefUpdaterParts(v) {
+  const match = String(v || '').replace(/^v/i, '').match(/^(\d+(?:\.\d+){0,3})$/);
+  return match ? match[1].split('.').map(Number) : null;
+}
+function tubechiefUpdaterCompare(a, b) {
+  const x = tubechiefUpdaterParts(a), y = tubechiefUpdaterParts(b);
+  if (!x || !y) return null;
+  for (let i = 0; i < 4; i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? 1 : -1;
+  }
+  return 0;
+}
+async function tubechiefUpdaterRead() {
+  const data = await chrome.storage.local.get(TUBECHIEF_UPDATER_KEY);
+  return { notificationsEnabled: true, readyVersion: '', notifiedKey: '',
+    latest: '', latestUrl: TUBECHIEF_UPDATER_RELEASES, checkedAt: '', error: '',
+    ...(data[TUBECHIEF_UPDATER_KEY] || {}) };
+}
+async function tubechiefUpdaterWrite(next) {
+  await chrome.storage.local.set({ [TUBECHIEF_UPDATER_KEY]: next });
+  return next;
+}
+async function tubechiefUpdaterNotify(version, ready) {
+  const state = await tubechiefUpdaterRead();
+  if (!state.notificationsEnabled || !version) return;
+  const key = `${ready ? 'ready' : 'release'}:${version}`;
+  if (state.notifiedKey === key) return;
+  await tubechiefUpdaterWrite({ ...state, notifiedKey: key });
+  try {
+    await chrome.notifications.create(TUBECHIEF_UPDATER_NOTICE, {
+      type: 'basic', iconUrl: 'icon-128.png',
+      title: ready ? `TubeChief ${version} pregătit` : `TubeChief ${version} disponibil`,
+      message: ready ? 'Edge a descărcat actualizarea. Deschide TubeChief pentru aplicare.'
+                     : 'A apărut o versiune nouă pe GitHub. Deschide TubeChief pentru detalii.',
+      priority: 1
+    });
+  } catch (_) { /* Notifications may be disabled by the OS, especially on Android. */ }
+}
+async function tubechiefUpdaterCheck(force = false) {
+  if (tubechiefUpdaterRunning) return tubechiefUpdaterRunning;
+  tubechiefUpdaterRunning = (async () => {
+    const localVersion = chrome.runtime.getManifest().version;
+    const previous = await tubechiefUpdaterRead();
+    const checkedAt = new Date().toISOString();
+    try {
+      const response = await fetch(TUBECHIEF_UPDATER_API, {
+        method: 'GET', credentials: 'omit', cache: 'no-store',
+        headers: { 'Accept': 'application/vnd.github+json' },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (response.status === 404) {
+        const state = await tubechiefUpdaterWrite({ ...previous, checkedAt,
+          error: 'no_release', latest: '', latestUrl: TUBECHIEF_UPDATER_RELEASES });
+        return { ok: true, ...state, installed: localVersion, updateAvailable: false };
+      }
+      if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
+      const data = await response.json();
+      // Only stable releases with a numeric extension version are compared.
+      const published = String(data?.tag_name || '').replace(/^v/i, '');
+      if (data?.draft || data?.prerelease || !tubechiefUpdaterParts(published)) {
+        throw new Error('Release fără versiune stabilă validă');
+      }
+      const newer = tubechiefUpdaterCompare(published, localVersion) === 1;
+      const tag = encodeURIComponent(String(data.tag_name));
+      const latestUrl = `${TUBECHIEF_UPDATER_RELEASES}/tag/${tag}`;
+      const state = await tubechiefUpdaterWrite({ ...previous, latest: published,
+        latestUrl, checkedAt, error: '' });
+      if (newer && !state.readyVersion) await tubechiefUpdaterNotify(published, false);
+      return { ok: true, ...state, installed: localVersion, updateAvailable: newer };
+    } catch (err) {
+      const state = await tubechiefUpdaterWrite({ ...previous, checkedAt,
+        error: String(err?.message || err) });
+      return { ok: false, ...state, installed: localVersion,
+        updateAvailable: tubechiefUpdaterCompare(state.latest, localVersion) === 1 };
+    }
+  })();
+  try { return await tubechiefUpdaterRunning; }
+  finally { tubechiefUpdaterRunning = null; }
+}
+async function tubechiefUpdaterStatus() {
+  const s = await tubechiefUpdaterRead();
+  const installed = chrome.runtime.getManifest().version;
+  return { ok: true, ...s, installed,
+    updateAvailable: tubechiefUpdaterCompare(s.latest, installed) === 1,
+    ready: Boolean(s.readyVersion && tubechiefUpdaterCompare(s.readyVersion, installed) === 1),
+    canAutoInstall: Boolean(chrome.runtime.getManifest().update_url),
+    // update_url is not a guarantee of unattended updates: browser policy still applies.
+    distribution: chrome.runtime.getManifest().update_url ? 'self-hosted-or-store' : 'browser-managed-or-unpacked' };
+}
+async function tubechiefUpdaterMessage(msg) {
+  if (msg.type === 'tubechiefUpdateStatus') return tubechiefUpdaterStatus();
+  if (msg.type === 'tubechiefUpdateCheck') return tubechiefUpdaterCheck(true);
+  if (msg.type === 'tubechiefUpdateNotifications') {
+    const state = await tubechiefUpdaterRead();
+    await tubechiefUpdaterWrite({ ...state, notificationsEnabled: msg.enabled === true });
+    return tubechiefUpdaterStatus();
+  }
+  if (msg.type === 'tubechiefUpdateApply') {
+    const state = await tubechiefUpdaterStatus();
+    if (!state.ready) return { ok: false, error: 'Browserul nu a descărcat o actualizare instalabilă.' };
+    // Respond before reloading; the browser itself performs the signed update.
+    setTimeout(() => chrome.runtime.reload(), 200);
+    return { ok: true, applying: true };
+  }
+  return { ok: false, error: 'Unknown updater message' };
+}
+function tubechiefUpdaterSetup() {
+  chrome.alarms.get(TUBECHIEF_UPDATER_ALARM).then(alarm => {
+    if (!alarm) chrome.alarms.create(TUBECHIEF_UPDATER_ALARM, { periodInMinutes: 360 });
+  }).catch(() => {});
+}
+chrome.runtime.onInstalled.addListener(() => {
+  tubechiefUpdaterSetup();
+  tubechiefUpdaterCheck().catch(() => {});
+});
+chrome.runtime.onStartup.addListener(() => {
+  tubechiefUpdaterSetup();
+  tubechiefUpdaterCheck().catch(() => {});
+});
+chrome.alarms.onAlarm.addListener(a => {
+  if (a.name === TUBECHIEF_UPDATER_ALARM) tubechiefUpdaterCheck().catch(() => {});
+});
+chrome.runtime.onUpdateAvailable.addListener(details => {
+  const version = String(details?.version || '');
+  if (!tubechiefUpdaterParts(version)) return;
+  tubechiefUpdaterRead().then(s => tubechiefUpdaterWrite({ ...s, readyVersion: version }))
+    .then(() => tubechiefUpdaterNotify(version, true)).catch(() => {});
+});
+chrome.notifications.onClicked.addListener(id => {
+  if (id !== TUBECHIEF_UPDATER_NOTICE) return;
+  chrome.tabs.create({ url: TUBECHIEF_UPDATER_RELEASES }).catch(() => {});
+});
+// Service-worker alarms may be cleared on browser restart. Repair on wakeup.
+tubechiefUpdaterSetup();
