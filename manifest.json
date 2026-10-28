@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Favorites Feed",
-  "version": "1.5.2",
+  "version": "1.5.6",
   "default_locale": "en",
   "description": "Local YouTube favorites feed with persistent history, backup export/import, online users, theater mode, build history, smoother overlay alignment and overlay settings shortcut.",
   "permissions": [
@@ -15,7 +15,8 @@
     "https://*.youtube.com/*",
     "https://api.github.com/*",
     "https://github.com/*",
-    "https://*/*"
+    "https://*/*",
+    "https://m.youtube.com/*"
   ],
   "action": {
     "default_title": "__MSG_extName__",
@@ -38,10 +39,12 @@
     {
       "matches": [
         "https://www.youtube.com/*",
-        "https://youtube.com/*"
+        "https://youtube.com/*",
+        "https://m.youtube.com/*"
       ],
       "js": [
-        "content.js"
+        "content.js",
+        "tubechief-window-ux.js"
       ],
       "run_at": "document_idle"
     }
@@ -54,7 +57,8 @@
       ],
       "matches": [
         "https://www.youtube.com/*",
-        "https://youtube.com/*"
+        "https://youtube.com/*",
+        "https://m.youtube.com/*"
       ]
     }
   ]

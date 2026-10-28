@@ -977,7 +977,7 @@
     if (currentId && currentId !== lastRelatedVideoId) {
       lastRelatedVideoId = currentId;
       const cached = await getCachedRelated(currentId);
-      if (cached.length) relatedVideos = cached;
+      relatedVideos = cached.length ? cached : [];
     }
     relatedLoading = Boolean(showLoading && !relatedVideos.length);
     if (showLoading) render();
@@ -987,7 +987,7 @@
       if (delay) await sleep(delay);
       const found = extractRelatedVideos();
       if (found.length) {
-        relatedVideos = await enrichVideosWithChannelData(found);
+        relatedVideos = mergeTubechiefRelatedVideos(relatedVideos, await enrichVideosWithChannelData(found));
         await saveRelatedToCache(currentId, relatedVideos);
         break;
       }
@@ -1003,7 +1003,7 @@
     if (!id) return;
     lastRelatedVideoId = id;
     const cached = await getCachedRelated(id);
-    if (cached.length) relatedVideos = cached;
+    relatedVideos = cached.length ? cached : [];
   }
 
   async function getCachedRelated(videoId) {
@@ -1023,7 +1023,7 @@
     try {
       const data = await storageGet([RELATED_CACHE_KEY]);
       const cache = data[RELATED_CACHE_KEY] || {};
-      cache[videoId] = { ts: Date.now(), videos: videos.slice(0, 50) };
+      cache[videoId] = { ts: Date.now(), videos: videos.slice(0, 200) };
       const keys = Object.keys(cache).sort((a, b) => (cache[b].ts || 0) - (cache[a].ts || 0));
       for (const key of keys.slice(30)) delete cache[key];
       await storageSet({ [RELATED_CACHE_KEY]: cache });
@@ -1059,13 +1059,16 @@
     return list;
   }
 
+    function mergeTubechiefRelatedVideos(previous, incoming) {
+    return dedupeVideos([...(previous || []), ...(incoming || [])], 220);
+  }
   function extractRelatedVideos() {
     if (!location.href.includes('/watch')) return [];
     const current = getCurrentVideoId();
-    const fromAnchors = extractVideosFromAnchors(90);
-    const fromDom = extractVideosFromDom(60, true);
-    const fromJson = extractVideosFromScripts(120);
-    return dedupeVideos([...fromJson, ...fromDom, ...fromAnchors], 45).filter(v => v.videoId && v.videoId !== current).slice(0, 36);
+    const fromAnchors = extractVideosFromAnchors(260);
+    const fromDom = extractVideosFromDom(260, true);
+    const fromJson = extractVideosFromScripts(320);
+    return dedupeVideos([...fromJson, ...fromDom, ...fromAnchors], 240).filter(v => v.videoId && v.videoId !== current).slice(0, 200);
   }
   function extractVideosFromAnchors(max) {
     const roots = [];
