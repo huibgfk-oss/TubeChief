@@ -298,3 +298,31 @@
   opacity: 1 !important;
   caret-color: #fff !important;
 }
+
+
+/* Windows-only temporary scroll/performance diagnostic: solid, unblurred panel. */
+.fys-panel.tc-solid-background {
+  background: #111 !important;
+  background-color: #111 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  will-change: auto !important;
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-wrap.fys-accessibility .fys-panel.tc-solid-background { background: #000 !important; background-color: #000 !important; }
+.fys-panel.tc-solid-background .fys-header {
+  background: #202020 !important;
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-panel.tc-solid-background .fys-body,
+.fys-panel.tc-solid-background .fys-tabs {
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-panel.tc-solid-background .fys-btn:hover,
+.fys-panel.tc-solid-background .fys-mini:hover,
+.fys-panel.tc-solid-background .fys-page-btn:hover { filter: none !important; }
+.fys-btn.tc-solid-toggle[aria-pressed="true"] { background: #f0c674 !important; color: #111 !important; }

@@ -4,6 +4,8 @@
   ensurePageBridge();
 
   const ROOT_ID = 'youtube-favorites-feed-overlay-root';
+  const tcWindowsDesktop = /Windows NT/i.test(navigator.userAgent);
+  let tcSolidBackground = false;
   const DEFAULTS = { overlayOpen: true, overlayTab: 'feed', overlayPages: { feed: 1, related: 1, search: 1, favvideos: 1, history: 1 } };
   const RELATED_CACHE_KEY = 'yff_related_cache_v1';
   const PAGE_SIZE = 6;
@@ -333,6 +335,33 @@
   opacity: 1 !important;
   caret-color: #fff !important;
 }
+
+/* Windows-only temporary scroll/performance diagnostic: solid, unblurred panel. */
+.fys-panel.tc-solid-background {
+  background: #111 !important;
+  background-color: #111 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  will-change: auto !important;
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-wrap.fys-accessibility .fys-panel.tc-solid-background { background: #000 !important; background-color: #000 !important; }
+.fys-panel.tc-solid-background .fys-header {
+  background: #202020 !important;
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-panel.tc-solid-background .fys-body,
+.fys-panel.tc-solid-background .fys-tabs {
+  backface-visibility: visible !important;
+  transform: none !important;
+}
+.fys-panel.tc-solid-background .fys-btn:hover,
+.fys-panel.tc-solid-background .fys-mini:hover,
+.fys-panel.tc-solid-background .fys-page-btn:hover { filter: none !important; }
+.fys-btn.tc-solid-toggle[aria-pressed="true"] { background: #f0c674 !important; color: #111 !important; }
 `;
   let rootHost = null, shadow = null, state = null, drag = null, lastUrl = location.href;
   let preservedPanelScroll = null;
@@ -552,10 +581,10 @@
       <style>${STYLE_TEXT}</style>
       <div class="fys-wrap ${accessibility ? 'fys-accessibility' : ''}">
         <button class="fys-collapsed ${open ? 'fys-hidden' : ''}" id="fysOpen">${t('collapsed')}</button>
-        <section class="fys-panel ${open ? '' : 'fys-hidden'}" id="fysPanel" ${style}>
+        <section class="fys-panel ${open ? '' : 'fys-hidden'} ${tcWindowsDesktop && tcSolidBackground ? 'tc-solid-background' : ''}" id="fysPanel" ${style}>
           <header class="fys-header" id="fysDragHandle">
             <div><div class="fys-title">${t('title')}</div><div class="fys-subtitle">${t('subtitle')}${renderOnlineUsersInline()}</div></div>
-            <div class="fys-actions"><button class="fys-btn" id="fysSettings" title="${escapeAttr(t('openSettings'))}">⚙</button><button class="fys-btn" id="fysRefresh" title="Refresh">↻</button><button class="fys-btn ${state?.settings?.theaterMode ? 'active-eye' : ''}" id="fysTheater" title="${escapeAttr(t('theaterToggle'))}">🎭</button><button class="fys-btn ${accessibility ? 'active-eye' : ''}" id="fysAccessibility" title="${escapeAttr(t('accessibilityToggle'))}">👁</button><button class="fys-btn red" id="fysClose" title="Close">×</button></div>
+            <div class="fys-actions"><button class="fys-btn" id="fysSettings" title="${escapeAttr(t('openSettings'))}">⚙</button>${tcWindowsDesktop ? `<button class="fys-btn tc-solid-toggle" id="tcSolidToggle" type="button" aria-pressed="${tcSolidBackground}" title="Fundal solid / dezactivează transparența și blurul (Windows)">◧</button>` : ''}<button class="fys-btn" id="fysRefresh" title="Refresh">↻</button><button class="fys-btn ${state?.settings?.theaterMode ? 'active-eye' : ''}" id="fysTheater" title="${escapeAttr(t('theaterToggle'))}">🎭</button><button class="fys-btn ${accessibility ? 'active-eye' : ''}" id="fysAccessibility" title="${escapeAttr(t('accessibilityToggle'))}">👁</button><button class="fys-btn red" id="fysClose" title="Close">×</button></div>
           </header>
           <nav class="fys-tabs">
             <button class="fys-tab ${ui.overlayTab === 'feed' ? 'active' : ''}" data-tab="feed">${t('whatsNew')}</button>
@@ -799,6 +828,14 @@
     $('fysClose')?.addEventListener('click', async () => { ui.overlayOpen = false; await storageSet({ overlayOpen: false }); render(); });
     $('fysRefresh')?.addEventListener('click', async () => { await updateCurrentVideoStatus(); if (ui.overlayTab === 'related') await refreshRelatedVideos(true); await refresh(); });
     $('fysSettings')?.addEventListener('click', openExtensionSettings);
+    $('tcSolidToggle')?.addEventListener('click', () => {
+      tcSolidBackground = !tcSolidBackground;
+      const panel = shadow.getElementById('fysPanel');
+      panel?.classList.toggle('tc-solid-background', tcSolidBackground);
+      const button = shadow.getElementById('tcSolidToggle');
+      button?.setAttribute('aria-pressed', String(tcSolidBackground));
+      button?.setAttribute('title', tcSolidBackground ? 'Fundal solid activ – revino la aspectul inițial' : 'Fundal solid / dezactivează transparența și blurul (Windows)');
+    });
     $('fysAccessibility')?.addEventListener('click', toggleAccessibilityMode);
     $('fysTheater')?.addEventListener('click', toggleTheaterMode);
     shadow.querySelectorAll('.fys-tab').forEach(btn => btn.addEventListener('click', async () => { ui.overlayTab = btn.dataset.tab; await storageSet({ overlayTab: ui.overlayTab }); if (ui.overlayTab === 'related') await refreshRelatedVideos(true); else render(); }));
