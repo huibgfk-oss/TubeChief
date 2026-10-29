@@ -427,11 +427,35 @@ async function importData(payload) {
 
 async function searchVideos(query) {
   const q = String(query || '').trim();
-  if (!q) return { ok: false, error: 'Enter a search term.' };
-  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-  const html = await fetchText(url);
-  const videos = extractVideosFromHtml(html, 30).map(v => ({ ...v, source: 'search' }));
-  return { ok: true, videos };
+  if (!q) return { ok: false, error: 'Introduce un termen de căutare.' };
+  const urls = [
+    `https://m.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+    `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&app=desktop`,
+    `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`
+  ];
+  const diagnostics = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        credentials: 'include', cache: 'no-store', redirect: 'follow',
+        headers: { 'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8' }
+      });
+      if (!response.ok) { diagnostics.push('HTTP ' + response.status); continue; }
+      const html = await response.text();
+      if (/consent\.youtube\.com|consent\.google\.com/i.test(response.url || '') ||
+          (/consent\.youtube|consent\.google/i.test(html.slice(0, 2500)))) {
+        diagnostics.push('YouTube cere consimțământul'); continue;
+      }
+      const videos = extractVideosFromHtml(html, 40).map(v => ({ ...v, source: 'search' }));
+      if (videos.length) return { ok: true, videos };
+      diagnostics.push(extractInitialData(html) ? 'format rezultate neidentificat' : 'lipsește ytInitialData');
+    } catch (err) {
+      diagnostics.push(String(err?.message || err).slice(0, 100));
+    }
+  }
+  return { ok: false, videos: [], fallbackUrl: urls[0],
+    error: 'TubeChief nu poate citi căutarea YouTube pe acest dispozitiv (' +
+      [...new Set(diagnostics)].join('; ') + '). Deschide căutarea direct pe YouTube.' };
 }
 
 async function resolveChannel(inputRaw) {
@@ -529,28 +553,42 @@ function extractVideosFromHtml(html, max = 30) {
   return dedup;
 }
 function extractInitialData(html) {
-  const markers = ['var ytInitialData = ', 'window["ytInitialData"] = '];
-  for (const marker of markers) {
-    const idx = html.indexOf(marker);
-    if (idx >= 0) {
-      const start = html.indexOf('{', idx);
+  const markers = [
+    /(?:var\s+)?ytInitialData\s*=\s*/g,
+    /window\s*\[\s*["']ytInitialData["']\s*\]\s*=\s*/g,
+    /window\.ytInitialData\s*=\s*/g,
+    /["']ytInitialData["']\s*:\s*/g
+  ];
+  for (const pattern of markers) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(html))) {
+      const from = match.index + match[0].length;
+      const start = html.indexOf('{', from);
+      if (start < from || start - from > 10) continue;
       const end = findJsonEnd(html, start);
-      if (start >= 0 && end > start) { try { return JSON.parse(html.slice(start, end + 1)); } catch (_) {} }
+      if (end <= start || end - start > 8_000_000) continue;
+      try { return JSON.parse(html.slice(start, end + 1)); } catch (_) {}
     }
   }
   return null;
 }
+
 function findJsonEnd(text, start) { let depth = 0, str = false, esc = false; for (let i = start; i < text.length; i++) { const ch = text[i]; if (str) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') str = false; } else { if (ch === '"') str = true; else if (ch === '{') depth++; else if (ch === '}') { depth--; if (depth === 0) return i; } } } return -1; }
 function textRuns(obj) { const runs = obj?.runs || obj?.simpleText ? (obj.runs || [{ text: obj.simpleText }]) : []; return runs.map(r => r.text || '').join('').trim(); }
 function thumbUrl(obj) { const arr = obj?.thumbnails || obj?.thumbnail?.thumbnails || []; return arr[arr.length - 1]?.url || ''; }
 function walkJsonForVideos(node, out, max) {
   if (!node || out.length >= max) return;
-  if (Array.isArray(node)) { for (const x of node) { walkJsonForVideos(x, out, max); if (out.length >= max) break; } return; }
+  if (Array.isArray(node)) {
+    for (const item of node) { walkJsonForVideos(item, out, max); if (out.length >= max) break; }
+    return;
+  }
   if (typeof node !== 'object') return;
-  const vr = node.videoRenderer || node.compactVideoRenderer || node.gridVideoRenderer || node.reelItemRenderer;
-  if (vr?.videoId) {
-    const owner = vr.ownerText || vr.shortBylineText || vr.longBylineText || {};
-    const run = owner.runs?.[0] || {};
+  const vr = node.videoRenderer || node.compactVideoRenderer || node.gridVideoRenderer ||
+    node.videoWithContextRenderer || node.reelItemRenderer;
+  if (vr?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(vr.videoId)) {
+    const owner = vr.ownerText || vr.shortBylineText || vr.longBylineText || vr.byline || {};
+    const run = owner?.runs?.[0] || {};
     out.push({
       videoId: vr.videoId,
       title: textRuns(vr.title) || textRuns(vr.headline) || vr.videoId,
@@ -558,12 +596,24 @@ function walkJsonForVideos(node, out, max) {
       publishedAt: textRuns(vr.publishedTimeText) || '',
       channelTitle: textRuns(owner) || 'YouTube',
       channelId: run.navigationEndpoint?.browseEndpoint?.browseId || '',
-      channelUrl: run.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url ? `https://www.youtube.com${run.navigationEndpoint.commandMetadata.webCommandMetadata.url}` : '',
+      channelUrl: run.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url ?
+        `https://www.youtube.com${run.navigationEndpoint.commandMetadata.webCommandMetadata.url}` : '',
       channelAvatarUrl: thumbUrl(vr.channelThumbnailSupportedRenderers?.channelThumbnailWithLinkRenderer?.thumbnail) || thumbUrl(vr.thumbnail)
     });
   }
-  for (const v of Object.values(node)) walkJsonForVideos(v, out, max);
+  const lv = node.lockupViewModel;
+  if (lv?.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO' && /^[a-zA-Z0-9_-]{11}$/.test(lv.contentId || '')) {
+    const title = lv.metadata?.lockupMetadataViewModel?.title;
+    out.push({
+      videoId: lv.contentId,
+      title: (typeof title?.content === 'string' ? title.content : textRuns(title)) || lv.contentId,
+      url: `https://www.youtube.com/watch?v=${lv.contentId}`,
+      channelTitle: 'YouTube', channelId: ''
+    });
+  }
+  for (const value of Object.values(node)) walkJsonForVideos(value, out, max);
 }
+
 function decodeHtml(s) { return String(s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>'); }
 
 

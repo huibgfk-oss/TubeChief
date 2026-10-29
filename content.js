@@ -344,6 +344,7 @@
   let lang = 'en';
   let relatedVideos = [];
   let searchResults = [];
+  let tubeChiefSearchQuery = '';
   let lastRelatedVideoId = '';
   let internalNavigationInProgress = false;
   let relatedLoading = false;
@@ -737,8 +738,13 @@
   }
   function renderSearchTab() {
     const videos = searchResults || [], page = getPage('search', videos.length), pageVideos = paginate('search', videos);
-    return `<div class="fys-row fys-search-row"><input id="fysSearchInput" placeholder="${escapeAttr(t('searchPlaceholder'))}"><button class="fys-btn" id="fysSearchBtn">${t('search')}</button></div><div class="fys-toolbar"><span class="fys-count">${videos.length ? `${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}` : t('searchFirst')}</span><button class="fys-btn gray" data-play-list="search">▶ ${t('playAll')}</button></div><div id="fysSearchResults">${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : ''}</div>`;
+    const term = tubeChiefSearchQuery || tubeChiefInputDrafts.search || '';
+    const nativeUrl = `https://m.youtube.com/results?search_query=${encodeURIComponent(term)}`;
+    return `<div class="fys-row fys-search-row"><input id="fysSearchInput" placeholder="${escapeAttr(t('searchPlaceholder'))}"><button class="fys-btn" id="fysSearchBtn">${t('search')}</button></div>
+      ${term ? `<div class="fys-hint"><a href="${escapeAttr(nativeUrl)}" data-tc-native-search="${escapeAttr(nativeUrl)}" style="color:#9dc3ff;text-decoration:underline">Deschide căutarea pe YouTube ↗</a></div>` : ''}
+      <div class="fys-toolbar"><span class="fys-count">${videos.length ? `${videos.length} ${t('videos')} · ${t('page')} ${page}/${totalPages(videos.length)}` : t('searchFirst')}</span><button class="fys-btn gray" data-play-list="search">▶ ${t('playAll')}</button></div><div id="fysSearchResults">${videos.length ? pageVideos.map(v => renderVideo(v, false, { save: true, channel: true })).join('') : ''}</div>`;
   }
+
   function renderFavoriteVideosTab() {
     const videos = state.favoriteVideos || [];
     const page = getPage('favvideos', videos.length), pageVideos = paginate('favvideos', videos);
@@ -814,6 +820,7 @@
     $('fysAddChannel')?.addEventListener('click', addChannelFromOverlay);
     $('fysChannelInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') addChannelFromOverlay(); });
     $('fysClearHistory')?.addEventListener('click', clearHistory);
+    shadow.querySelectorAll('[data-tc-native-search]').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); }));
     $('fysSearchBtn')?.addEventListener('click', searchVideos);
     $('fysSearchInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') searchVideos(); });
     const handle = $('fysDragHandle'); if (handle) { handle.addEventListener('mousedown', startDrag); handle.addEventListener('touchstart', startDrag, { passive: false }); }
@@ -995,9 +1002,23 @@
     }
   }
   async function searchVideos() {
-    const q = shadow.getElementById('fysSearchInput')?.value.trim(); if (!q) return render(t('searchFirst'), true);
-    render(t('searching')); const res = await send('searchVideos', { query: q }); searchResults = res.ok ? res.videos || [] : []; await loadState(); ui.overlayTab = 'search'; ui.overlayPages = { ...(ui.overlayPages || {}), search: 1 }; await storageSet({ overlayTab: 'search', overlayPages: ui.overlayPages }); render(res.ok ? (searchResults.length ? '' : t('noSearch')) : res.error, !res.ok);
+    const q = shadow.getElementById('fysSearchInput')?.value.trim();
+    if (!q) return render(t('searchFirst'), true);
+    tubeChiefSearchQuery = q;
+    saveTubeChiefInputDraft('search', q);
+    render(t('searching'));
+    let res;
+    try { res = await send('searchVideos', { query: q }); }
+    catch (err) { res = { ok: false, error: String(err?.message || err) }; }
+    searchResults = res?.ok && Array.isArray(res.videos) ? res.videos : [];
+    await loadState();
+    ui.overlayTab = 'search';
+    ui.overlayPages = { ...(ui.overlayPages || {}), search: 1 };
+    await storageSet({ overlayTab: 'search', overlayPages: ui.overlayPages });
+    render(res?.ok ? (searchResults.length ? '' : t('noSearch')) :
+      (res?.error || 'Căutarea YouTube nu este disponibilă.'), !res?.ok);
   }
+
   async function saveVideoById(videoId, btn) {
     const v = findVideoById(videoId);
     if (!v) return;
